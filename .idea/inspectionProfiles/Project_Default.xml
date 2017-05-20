@@ -1,0 +1,66 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="HtmlUnknownAttribute" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="myValues">
+        <value>
+          <list size="11">
+            <item index="0" class="java.lang.String" itemvalue="flex" />
+            <item index="1" class="java.lang.String" itemvalue="flex-offset-gt-sm" />
+            <item index="2" class="java.lang.String" itemvalue="flex-gt-sm" />
+            <item index="3" class="java.lang.String" itemvalue="layout" />
+            <item index="4" class="java.lang.String" itemvalue="layout-fill" />
+            <item index="5" class="java.lang.String" itemvalue="ng-repeat" />
+            <item index="6" class="java.lang.String" itemvalue="person" />
+            <item index="7" class="java.lang.String" itemvalue="on-click" />
+            <item index="8" class="java.lang.String" itemvalue="ng-src" />
+            <item index="9" class="java.lang.String" itemvalue="ng-bind-html" />
+            <item index="10" class="java.lang.String" itemvalue="parent-state" />
+          </list>
+        </value>
+      </option>
+      <option name="myCustomValuesEnabled" value="true" />
+    </inspection_tool>
+    <inspection_tool class="HtmlUnknownTag" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="myValues">
+        <value>
+          <list size="22">
+            <item index="0" class="java.lang.String" itemvalue="nobr" />
+            <item index="1" class="java.lang.String" itemvalue="noembed" />
+            <item index="2" class="java.lang.String" itemvalue="comment" />
+            <item index="3" class="java.lang.String" itemvalue="noscript" />
+            <item index="4" class="java.lang.String" itemvalue="embed" />
+            <item index="5" class="java.lang.String" itemvalue="script" />
+            <item index="6" class="java.lang.String" itemvalue="md-menu-content" />
+            <item index="7" class="java.lang.String" itemvalue="md-menu-item" />
+            <item index="8" class="java.lang.String" itemvalue="md-button" />
+            <item index="9" class="java.lang.String" itemvalue="md-icon" />
+            <item index="10" class="java.lang.String" itemvalue="md-menu" />
+            <item index="11" class="java.lang.String" itemvalue="md-toolbar" />
+            <item index="12" class="java.lang.String" itemvalue="md-list" />
+            <item index="13" class="java.lang.String" itemvalue="md-list-item" />
+            <item index="14" class="java.lang.String" itemvalue="md-sidenav" />
+            <item index="15" class="java.lang.String" itemvalue="md-content" />
+            <item index="16" class="java.lang.String" itemvalue="md-card" />
+            <item index="17" class="java.lang.String" itemvalue="md-card-title" />
+            <item index="18" class="java.lang.String" itemvalue="md-card-title-text" />
+            <item index="19" class="java.lang.String" itemvalue="md-card-title-media" />
+            <item index="20" class="java.lang.String" itemvalue="md-card-actions" />
+            <item index="21" class="java.lang.String" itemvalue="md-card-content" />
+          </list>
+        </value>
+      </option>
+      <option name="myCustomValuesEnabled" value="true" />
+    </inspection_tool>
+    <inspection_tool class="JSMethodCanBeStatic" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="JSUnusedGlobalSymbols" enabled="false" level="WARNING" enabled_by_default="false" />
+    <inspection_tool class="SpellCheckingInspection" enabled="false" level="TYPO" enabled_by_default="false">
+      <option name="processCode" value="true" />
+      <option name="processLiterals" value="true" />
+      <option name="processComments" value="true" />
+    </inspection_tool>
+    <inspection_tool class="UnterminatedStatementJS" enabled="false" level="WARNING" enabled_by_default="false">
+      <option name="ignoreSemicolonAtEndOfBlock" value="true" />
+    </inspection_tool>
+  </profile>
+</component>

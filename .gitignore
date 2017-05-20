@@ -1,0 +1,11 @@
+node_modules
+.tmp
+*.log
+.sass-cache
+.idea/workspace.xml
+.idea/tasks.xml
+dist/
+build/
+log/
+downloads/
+.env
