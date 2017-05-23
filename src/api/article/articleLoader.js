@@ -7,6 +7,7 @@ const ArticleModel = require('./articleModel')
 const ParagraphModel = require('./paragraphModel')
 const markDownService = require('../../services/markdownService')
 const headerParser = require('../../cli/headerParser')
+const autoCompleteIndexer = require('../search/autoCompleteIndexer')
 
 const WORD_REGEXP = XRegExp(String.raw`#?[-'\p{L}]{2,}`, 'g')
 
@@ -27,10 +28,11 @@ function createData(topic, data) {
   article.indexText = indexText
 
   return ArticleModel.create(article)
-    .then(() => bulkLoadParagraphs(article, topic))
+    .then(() => bulkWriteParagraphs(article, topic))
+    .then(() => autoCompleteIndexer())
 }
 
-function bulkLoadParagraphs(article, topic) {
+function bulkWriteParagraphs(article, topic) {
   const ops = article.paragraphs.reduce((acc, paragraph) => {
     paragraph.words.forEach(word => {
       acc.push({
