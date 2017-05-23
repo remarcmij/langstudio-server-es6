@@ -1,46 +1,38 @@
 'use strict'
-const _ = require('lodash')
 
 const LemmaModel = require('./lemmaModel')
-const WordModel = require('./wordModel')
-const search = require('../search/search')
-const log = require('../../services/logService')
-
-const REBUILD_DELAY = 10000  // 10 secs
-const debouncedRebuildWordCollection = _.debounce(rebuildWordCollection, REBUILD_DELAY)
+const autoCompleteIndexer = require('./autoCompleteIndexer')
 
 function createData(topic, uploadData) {
-  const collection = LemmaModel.collection
-  const bulk = collection.initializeUnorderedBulkOp()
-  const json = uploadData.payload
 
-  for (const lemmaDef of uploadData.payload.lemmas) {
-    for (const wordDef of lemmaDef.words) {
-      bulk.insert({
-        baseWord: lemmaDef.base,
-        homonym: lemmaDef.homonym,
-        text: lemmaDef.text,
-        word: wordDef.word,
-        attr: wordDef.attr,
-        order: wordDef.order,
-        lang: wordDef.lang,
-        baseLang: json.baseLang,
-        groupName: uploadData.topic.groupName,
-        _topic: topic._id
+  const ops = uploadData.payload.lemmas.reduce((acc, lemma) => {
+    lemma.words.forEach(word => {
+      acc.push({
+        insertOne: {
+          document: {
+            baseWord: lemma.base,
+            homonym: lemma.homonym,
+            text: lemma.text,
+            word: word.word,
+            attr: word.attr,
+            order: word.order,
+            lang: word.lang,
+            baseLang: uploadData.payload.baseLang,
+            groupName: uploadData.topic.groupName,
+            _topic: topic._id
+          }
+        }
       })
-    }
+    })
+    return acc
+  }, [])
+
+  if (ops.length === 0) {
+    return Promise.resolve()
   }
 
-  return new Promise((resolve, reject) => {
-    bulk.execute(err => {
-      if (err) {
-        reject(err)
-      } else {
-        debouncedRebuildWordCollection()
-        resolve()
-      }
-    })
-  })
+  LemmaModel.collection.bulkWrite(ops)
+    .then(() => autoCompleteIndexer())
 }
 
 function removeData(topic) {
@@ -51,7 +43,7 @@ function removeData(topic) {
 }
 
 function parseFile(content, fileName) {
-  const data= JSON.parse(content)
+  const data = JSON.parse(content)
 
   const match = fileName.match(/(.+)\.(.+)\./)
   if (!match) {
@@ -66,42 +58,6 @@ function parseFile(content, fileName) {
     },
     payload: data
   }
-}
-
-function rebuildWordCollection() {
-  const collection = WordModel.collection
-  WordModel.remove({})
-    .then(() => {
-      return LemmaModel.distinct('lang')
-    })
-    .then(languages => {
-      const promises = languages.map(lang => {
-        return LemmaModel.distinct('word', { lang })
-          .then(words => {
-            return { lang, words }
-          })
-      })
-      return Promise.all(promises)
-    })
-    .then(results => {
-
-      search.clearAutoCompleteCache()
-
-      const bulk = collection.initializeUnorderedBulkOp()
-
-      results.forEach(result => result.words.reduce((acc, word) => {
-        acc.insert({ word, lang: result.lang })
-        return acc
-      }, bulk))
-
-      bulk.execute(err => {
-        if (err) {
-          log.error(`auto-complete collection bulk insert error: ${err.message}`)
-        } else {
-          log.info(`auto-complete collection rebuilt`)
-        }
-      })
-    })
 }
 
 module.exports = {
