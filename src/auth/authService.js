@@ -18,9 +18,9 @@ function authGuard() {
   return compose()
     // Validate jwt
     .use(function (req, res, next) {
-      // allow access_token to be passed through query parameter as well
-      if (req.query && req.query.hasOwnProperty('access_token')) {
-        req.headers['authorization'] = 'Bearer ' + req.query['access_token']
+      // allow the access token to be passed through query parameter as well
+      if (req.query && req.query.hasOwnProperty('auth')) {
+        req.headers['authorization'] = 'Bearer ' + req.query['auth']
       }
       validateJwt(req, res, next)
     })

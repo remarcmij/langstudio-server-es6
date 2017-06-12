@@ -7,10 +7,10 @@ const log = require('../../services/logService')
 const CHUNK_SIZE = 50
 
 function search(req, res) {
-  const term = req.query.term
+  const condition = { word: req.query.word, wordLang: req.query.lang }
   const chunk = parseInt(req.query.chunk || '0', 10)
 
-  let groups
+  let groups = null
 
   if (req.user) {
     if (req.user.role !== 'admin') {
@@ -18,10 +18,6 @@ function search(req, res) {
     }
   } else {
     groups = ['public']
-  }
-
-  const condition = {
-    word: { $regex: '^' + term }
   }
 
   if (groups) {
@@ -40,7 +36,7 @@ function search(req, res) {
       res.json({ paragraphs, haveMore })
     })
     .catch(err => {
-      log.error(`search: '${term}', error: ${err.message}`, req)
+      log.error(`search: '${req.query.word}', error: ${err.message}`, req)
       res.status(500).send(err.message)
     })
 }
