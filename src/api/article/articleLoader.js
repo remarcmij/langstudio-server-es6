@@ -106,16 +106,16 @@ function parseFile(content, fileName) {
   }
 
   const topic = {
-    type: 'article',
     fileName,
     publication,
     chapter,
+    title,
+    subtitle,
+    type: 'article',
     foreignLang: header.get('targetLang'),
     baseLang: header.get('baseLang'),
     groupName: header.get('groupName') || 'public',
     sortIndex: parseInt(header.get('sortOrder') || '0', 10),
-    title,
-    subtitle,
     author: header.get('author'),
     copyright: header.get('copyright'),
     publisher: header.get('publisher'),
@@ -209,8 +209,7 @@ function extractAllWords(paragraph, baseLang, targetLang) {
   baseBuffer = baseBuffer.replace(/\n/g, ' ')
   targetBuffer = targetBuffer.replace(/\n/g, ' ')
 
-  return extractWords(baseBuffer, baseLang)
-    .concat(extractWords(targetBuffer, targetLang))
+  return [...extractWords(baseBuffer, baseLang), ...extractWords(targetBuffer, targetLang)]
 }
 
 function extractWords(buffer, lang) {

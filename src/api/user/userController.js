@@ -86,7 +86,7 @@ function changePassword(req, res) {
             validationError(res, err)
             return
           }
-          log.info('password changed', req)
+          log.info('password changed', req.user)
           res.sendStatus(200)
         })
       } else {
@@ -143,7 +143,7 @@ function changeGroups(req, res) {
         if (err) {
           return void res.status(422).json(err)
         }
-        log.info('groups changed', req)
+        log.info('groups changed', req.user)
         return void res.sendStatus(200)
       })
     })
@@ -204,7 +204,7 @@ function putSettings(req, res, next) {
       if (!user) {
         return res.sendStatus(401)
       }
-      log.debug(`settings updated`, req)
+      log.debug(`settings updated`, req.user)
       res.json(user.settings)
     })
 }

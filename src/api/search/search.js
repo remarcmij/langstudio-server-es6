@@ -7,6 +7,7 @@ const LemmaModel = require('./lemmaModel')
 const WordModel = require('./wordModel')
 const ParagraphModel = require('../article/paragraphModel')
 const log = require('../../services/logService')
+const auth = require('../../auth/authService')
 
 const VALID_AUTOCOMPLETE_TEXT = XRegExp('^[-\'()\\p{L}]+$')
 const CHUNK_SIZE = 50
@@ -16,59 +17,42 @@ const autoCompleteCache = LRU({
   maxAge: 1000 * 60 * 60
 })
 
-function paraSearch(req, res) {
+async function paraSearch(req, res) {
   const term = req.query.term
-  const chunk = parseInt(req.query.chunk || '0', 10)
 
-  let groups
+  try {
+    const chunk = parseInt(req.query.chunk || '0', 10)
 
-  if (req.user) {
-    if (req.user.role !== 'admin') {
-      groups = req.user.groups
+    const condition = {
+      word: { $regex: '^' + term }
     }
-  } else {
-    groups = ['public']
-  }
 
-  const condition = {
-    word: { $regex: '^' + term }
-  }
+    const groups = auth.getGroupsForUser(req.user)
+    if (groups) {
+      condition.groupName = { $in: groups }
+    }
 
-  if (groups) {
-    condition.groupName = { $in: groups }
-  }
+    const docs = await ParagraphModel
+      .find(condition)
+      .skip(CHUNK_SIZE * (chunk || 0))
+      .limit(CHUNK_SIZE)
+      .lean()
+      .exec()
 
-  ParagraphModel
-    .find(condition)
-    .skip(CHUNK_SIZE * (chunk || 0))
-    .limit(CHUNK_SIZE)
-    .lean()
-    .exec()
-    .then(docs => {
-      const haveMore = docs.length === CHUNK_SIZE
-      const paragraphs = _.uniqBy(docs, doc => doc._topic)
-      res.json({ paragraphs, haveMore })
-    })
-    .catch(err => {
-      log.error(`search: '${term}', error: ${err.message}`, req)
-      res.status(500).send(err.message)
-    })
+    const haveMore = docs.length === CHUNK_SIZE
+    const paragraphs = _.uniqBy(docs, doc => doc._topic)
+    res.json({ paragraphs, haveMore })
+  }
+  catch (err) {
+    log.error(`search: '${term}', error: ${err.message}`, req.user)
+    res.status(500).send(err.message)
+  }
 }
 
-function dictSearch(req, res) {
+async function dictSearch(req, res) {
   const words = req.query.word.split(',')
-  let groups
 
-  if (req.user) {
-    if (req.user.role !== 'admin') {
-      groups = req.user.groups
-    }
-  } else {
-    groups = ['public']
-  }
-
-  // todo: delete/disable next line to properly check groups
-  // groups = ['teeuw', 'vandale']
+  const groups = auth.getGroupsForUser(req.user)
 
   const searchFunctions = words.map(word => {
     return docs => {
@@ -103,7 +87,7 @@ function dictSearch(req, res) {
       res.json({ lemmas, haveMore })
     })
     .catch(err => {
-      log.error(`search: '${req.params.word}', error: ${err.message}`, req)
+      log.error(`search: '${req.params.word}', error: ${err.message}`, req.user)
       res.status(500).send(err.message)
     })
 }
@@ -126,24 +110,18 @@ function doSearch(sr) {
     condition.groupName = { $in: sr.groups }
   }
 
-  if (sr.chunk === -1) {
-    return LemmaModel
-      .find(condition)
-      .sort('word order')
-      .lean()
-      .exec()
-  } else {
-    return LemmaModel
-      .find(condition)
-      .sort('word order')
-      .skip(CHUNK_SIZE * (sr.chunk || 0))
-      .limit(CHUNK_SIZE)
-      .lean()
-      .exec()
+  let query = LemmaModel
+    .find(condition)
+    .sort('word order')
+
+  if (sr.chunk !== -1) {
+    query = query.skip(CHUNK_SIZE * (sr.chunk || 0)).limit(CHUNK_SIZE)
   }
+
+  return query.lean().exec()
 }
 
-function autoCompleteSearch(req, res) {
+async function autoCompleteSearch(req, res) {
   const term = req.query.term.trim()
 
   if (term.length === 0 || !VALID_AUTOCOMPLETE_TEXT.test(term)) {
@@ -151,22 +129,23 @@ function autoCompleteSearch(req, res) {
   }
 
   const cachedResult = autoCompleteCache.get(term)
-
   if (cachedResult) {
     log.silly(`cache hit for '${term}'`)
-    res.json(cachedResult.items)
-  } else {
-    WordModel.find({ word: { $regex: '^' + term } })
+    return res.json(cachedResult.items)
+  }
+
+  try {
+    const items = await WordModel.find({ word: { $regex: '^' + term } })
       .select('-_id')
       .limit(10)
       .lean()
       .exec()
-      .then(items => {
-        const result = { term, items }
-        autoCompleteCache.set(term, result)
-        log.silly(`cache store for '${term}'`)
-        res.json(items)
-      })
+    autoCompleteCache.set(term, { term, items })
+    log.silly(`cache store for '${term}'`)
+    res.json(items)
+  }
+  catch (err) {
+    res.sendStatus(500)
   }
 }
 

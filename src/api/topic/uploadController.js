@@ -131,7 +131,7 @@ function uploadFile(req, res) {
     taskQueue.pushTask(() => {
       return importFile(file.path, file.originalFilename)
         .then(() => {
-          log.info(`file '${file.originalFilename}' uploaded succesfully`, req)
+          log.info(`file '${file.originalFilename}' uploaded succesfully`, req.user)
           PubSub.publish(AppConstants.INVALIDATE_CACHES, null)
           res.json({ fileName: file.originalFilename })
         })
@@ -142,7 +142,7 @@ function uploadFile(req, res) {
           } else {
             message = err.message
           }
-          log.error(`error uploading file '${file.originalFilename}': ${message}`, req)
+          log.error(`error uploading file '${file.originalFilename}': ${message}`, req.user)
           res.status(400).send(JSON.stringify({
             fileName: file.originalFilename,
             message: message

@@ -91,16 +91,15 @@ function setTokenCookie(req, res) {
   res.redirect('/')
 }
 
-function getAuthorizedGroups(req) {
+function getGroupsForUser(user) {
   const publicGroups = ['public']
   let groups = []
 
-  if (req.user) {
-    if (req.user.role === 'admin') {
+  if (user) {
+    if (user.role === 'admin') {
       return null
     }
-    groups = req.user.groups
-    groups = _.uniq(groups.concat(publicGroups))
+    groups = _.uniq([...user.groups, ...publicGroups])
   } else {
     groups = publicGroups
   }
@@ -114,5 +113,5 @@ module.exports = {
   hasProvider,
   signToken,
   setTokenCookie,
-  getAuthorizedGroups
+  getGroupsForUser
 }

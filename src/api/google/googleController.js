@@ -15,14 +15,14 @@ function getFile(req, res) {
 
   const filename = req.params.name
   if (!filename) {
-    log.error(`google.controller.getFile: incomplete request: missing filename`, req)
+    log.error(`google.controller.getFile: incomplete request: missing filename`, req.user)
     return void res.sendStatus(400)
   }
 
   googleDrive.getAccessToken(req.user)
     .then(accessToken => {
 
-      log.debug(`google.controller.getFile: attempting to get fileResource for: ${filename}`, req)
+      log.debug(`google.controller.getFile: attempting to get fileResource for: ${filename}`, req.user)
 
       return googleDrive.get(accessToken, {
         qs: {
@@ -34,11 +34,11 @@ function getFile(req, res) {
         assertKind(fileList, KIND_FILE_LIST, 'getFile')
 
         if (fileList.files.length === 0) {
-          log.debug(`google.controller.getFile: file not found`, req)
+          log.debug(`google.controller.getFile: file not found`, req.user)
           return void res.sendStatus(404)
         }
 
-        log.debug(`google.controller.getFile: received fileResource - now attempting to get file data`, req)
+        log.debug(`google.controller.getFile: received fileResource - now attempting to get file data`, req.user)
 
         return googleDrive.get(accessToken, {
           qs: {
@@ -46,12 +46,12 @@ function getFile(req, res) {
           }
         }, fileList.files[0].id)
           .then(data => {
-            log.debug(`google.controller.getFile: received file data`, req)
+            log.debug(`google.controller.getFile: received file data`, req.user)
             res.json({ text: data })
           })
       })
     }).catch(err => {
-      log.error(`google.controller.getFile: ${err.toString()}`, req)
+      log.error(`google.controller.getFile: ${err.toString()}`, req.user)
       res.json({ error: err.message })
     })
 }
@@ -64,7 +64,7 @@ function getSettings(req, res) {
   googleDrive.getAccessToken(req.user)
     .then(accessToken => {
 
-      log.debug(`google.controller.getSettings: attempting to get fileResource for: ${APP_SETTINGS_FILE}`, req)
+      log.debug(`google.controller.getSettings: attempting to get fileResource for: ${APP_SETTINGS_FILE}`, req.user)
 
       return googleDrive.get(accessToken, {
         qs: {
@@ -76,11 +76,11 @@ function getSettings(req, res) {
         assertKind(fileList, KIND_FILE_LIST, 'getSettings')
 
         if (fileList.files.length === 0) {
-          log.debug(`google.controller.getSettings: file not found`, req)
+          log.debug(`google.controller.getSettings: file not found`, req.user)
           return void res.sendStatus(404)
         }
 
-        log.debug(`google.controller.getSettings: received fileResource - now attempting to get file data`, req)
+        log.debug(`google.controller.getSettings: received fileResource - now attempting to get file data`, req.user)
 
         return googleDrive.get(accessToken, {
           qs: {
@@ -88,12 +88,12 @@ function getSettings(req, res) {
           }
         }, fileList.files[0].id)
           .then(data => {
-            log.debug(`google.controller.getSettings: received file data`, req)
+            log.debug(`google.controller.getSettings: received file data`, req.user)
             res.json({ text: data })
           })
       })
     }).catch(err => {
-      log.error(`google.controller.getSettings: ${err.message}`, req)
+      log.error(`google.controller.getSettings: ${err.message}`, req.user)
       res.json({ error: err.message })
     })
 }
@@ -107,13 +107,13 @@ function saveFile(req, res) {
   const clientData = req.body
 
   if (!filename || !clientData) {
-    log.error(`google.controller.saveFile: incomplete request: missing filename or request body`, req)
+    log.error(`google.controller.saveFile: incomplete request: missing filename or request body`, req.user)
     return void res.sendStatus(400)
   }
 
   googleDrive.getAccessToken(req.user)
     .then(accessToken => {
-      log.debug(`google.controller.saveFile: checking if file exists: ${filename}`, req)
+      log.debug(`google.controller.saveFile: checking if file exists: ${filename}`, req.user)
 
       return googleDrive.get(accessToken, {
         qs: {
@@ -125,23 +125,23 @@ function saveFile(req, res) {
         assertKind(fileList, KIND_FILE_LIST, 'saveFile')
 
         if (fileList.files.length === 0) {
-          log.debug(`google.controller.saveFile: file doesn't exist - attempting to create`, req)
+          log.debug(`google.controller.saveFile: file doesn't exist - attempting to create`, req.user)
           return createDataFolderIfNotExists(accessToken)
             .then(parent => {
               assertKind(parent, KIND_FILE, 'saveFile')
               return createFile(accessToken, filename, parent.id, clientData)
                 .then(resource => {
                   assertKind(resource, KIND_FILE, 'saveFile')
-                  log.debug(`google.controller.saveFile: file created`, req)
+                  log.debug(`google.controller.saveFile: file created`, req.user)
                   res.json(resource)
                 })
             })
         } else {
-          log.debug(`google.controller.saveFile: file exists - attempting to update`, req)
+          log.debug(`google.controller.saveFile: file exists - attempting to update`, req.user)
           return updateFile(accessToken, fileList.files[0].id, clientData)
             .then(resource => {
               assertKind(resource, KIND_FILE, 'saveFile')
-              log.debug(`google.controller.saveFile: file updated`, req)
+              log.debug(`google.controller.saveFile: file updated`, req.user)
               res.json(resource)
             })
         }
@@ -160,13 +160,13 @@ function saveSettings(req, res) {
   const clientData = req.body
 
   if (!clientData) {
-    log.error(`google.controller.saveSettings: incomplete request: missing filename or request body`, req)
+    log.error(`google.controller.saveSettings: incomplete request: missing filename or request body`, req.user)
     return void res.sendStatus(400)
   }
 
   googleDrive.getAccessToken(req.user)
     .then(accessToken => {
-      log.debug(`google.controller.saveSettings: checking if file exists: ${APP_SETTINGS_FILE}`, req)
+      log.debug(`google.controller.saveSettings: checking if file exists: ${APP_SETTINGS_FILE}`, req.user)
 
       return googleDrive.get(accessToken, {
         qs: {
@@ -178,7 +178,7 @@ function saveSettings(req, res) {
         assertKind(fileList, KIND_FILE_LIST, 'saveSettings')
 
         if (fileList.files.length === 0) {
-          log.debug(`google.controller.saveSettings: file doesn't exist - attempting to create`, req)
+          log.debug(`google.controller.saveSettings: file doesn't exist - attempting to create`, req.user)
           return createFile(accessToken, APP_SETTINGS_FILE, APP_DATA_FOLDER, clientData)
             .then(resource => {
               assertKind(resource, KIND_FILE, 'saveSettings')
@@ -186,7 +186,7 @@ function saveSettings(req, res) {
               res.json(resource)
             })
         } else {
-          log.debug(`google.controller.saveSettings: file exists - attempting to update`, req)
+          log.debug(`google.controller.saveSettings: file exists - attempting to update`, req.user)
           return updateFile(accessToken, fileList.files[0].id, clientData)
             .then(resource => {
               assertKind(resource, KIND_FILE, 'saveFile')
@@ -196,7 +196,7 @@ function saveSettings(req, res) {
         }
       })
     }).catch(err => {
-      log.error(`google.controller.saveSettings: error: ${err.message}`, req)
+      log.error(`google.controller.saveSettings: error: ${err.message}`, req.user)
       res.sendStatus(500)
     })
 }

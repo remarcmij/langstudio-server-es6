@@ -27,9 +27,9 @@ function getFile(req, res) {
 
   res.download(filepath, filename, err => {
     if (err) {
-      log.error(`file download failed: ${filename}, error: ${err.message}`, req)
+      log.error(`file download failed: ${filename}, error: ${err.message}`, req.user)
     } else {
-      log.info(`file ${filename} downloaded successfully`, req)
+      log.info(`file ${filename} downloaded successfully`, req.user)
     }
   })
 }

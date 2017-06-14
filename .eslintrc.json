@@ -6,8 +6,8 @@
     "node": true
   },
   "parserOptions": {
-    "ecmaFeatures": {
-    },
+    "ecmaVersion": 2017,
+    "ecmaFeatures": {},
     "sourceType": "module"
   },
   "extends": [

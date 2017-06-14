@@ -10,50 +10,50 @@ winston.loggers.add('std', {
     colorize: true
   },
   file: {
-    filename: logpath + 'taalmap.log',
+    filename: logpath + 'langstudio.log',
     level: 'info',
     maxsize: 1000000,
-    json: true
+    json: false
   }
 })
 
 const log = winston.loggers.get('std')
 
-function debug(message, req) {
-  if (req) {
-    log.debug(message, { user: req.user ? req.user.handle : 'anonymous' })
+function debug(message, user) {
+  if (user) {
+    log.debug(message, { user: user ? user.email : 'anonymous' })
   } else {
     log.debug(message)
   }
 }
 
-function info(message, req) {
-  if (req) {
-    log.info(message, { user: req.user ? req.user.handle : 'anonymous' })
+function info(message, user) {
+  if (user) {
+    log.info(message, { user: user ? user.email : 'anonymous' })
   } else {
     log.info(message)
   }
 }
 
-function warn(message, req) {
-  if (req) {
-    log.warn(message, { user: req.user ? req.user.handle : 'anonymous' })
+function warn(message, user) {
+  if (user) {
+    log.warn(message, { user: user ? user.email : 'anonymous' })
   } else {
     log.warn(message)
   }
 }
 
-function error(message, req) {
-  if (req) {
-    log.error(message, { user: req.user ? req.user.handle : 'anonymous' })
+function error(message, user) {
+  if (user) {
+    log.error(message, { user: user ? user.email : 'anonymous' })
   } else {
     log.error(message)
   }
 }
 
-function silly(message, req) {
-  if (req) {
-    log.log('silly', message, { user: req.user ? req.user.handle : 'anonymous' })
+function silly(message, user) {
+  if (user) {
+    log.log('silly', message, { user: user ? user.email : 'anonymous' })
   } else {
     log.log('silly', message)
   }

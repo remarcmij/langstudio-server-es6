@@ -1,169 +1,145 @@
 'use strict'
-const _ = require('lodash')
-
 const TopicModel = require('./topicModel')
 const log = require('../../services/logService')
+const auth = require('../../auth/authService')
 
-const publicGroups = ['public']
+async function getCollection(req, res) {
+  try {
+    const criterion = { type: 'article', chapter: 'index' }
 
-function getCollection(req, res) {
-
-  getIndexTopics(req.user)
-    .then(topics => {
-      log.debug(`fetched collection`, req)
-      res.json(topics)
-    }, err => {
-      log.error(`get collection error ${err.message}`, req)
-      res.status(500).send(err)
-    })
-}
-
-function getIndexTopics(user) {
-  const criterion = {
-    type: 'article',
-    chapter: 'index'
-  }
-
-  const groups = getAuthorizedGroups(user)
-
-  if (groups) {
-    criterion.groupName = { $in: groups }
-  }
-
-  return TopicModel.find(criterion)
-    .sort('publication')
-    .lean().exec()
-
-}
-
-function getPublication(req, res) {
-  const publication = req.params.pub
-  const criterion = { type: 'article', publication }
-  const groups = getAuthorizedGroups(req.user)
-
-  if (groups) {
-    criterion.groupName = { $in: groups }
-  }
-
-  TopicModel.find(criterion)
-    .sort('sortIndex part title')
-    .lean()
-    .then((topics) => {
-      if (topics.length === 0) {
-        // no matching group or publication not found.
-        // treat as 'unauthorized' http error
-        res.sendStatus(401)
-      } else {
-        log.debug(`fetched publication ${publication} (${topics.length} topics)`, req)
-        res.json(topics)
-      }
-    }, err => {
-      log.error(`get publication ${publication} error ${err.message}`, req)
-      res.status(500).send(err)
-    })
-}
-
-function getAuthorizedGroups(user) {
-  let groups = []
-
-  if (user) {
-    if (user.role === 'admin') {
-      return null
+    const groups = auth.getGroupsForUser(req.user)
+    if (groups) {
+      criterion.groupName = { $in: groups }
     }
-    groups = user.groups
-    groups = _.uniq(groups.concat(publicGroups))
-  } else {
-    groups = publicGroups
-  }
 
-  return groups
+    const topics = await TopicModel.find(criterion)
+      .sort('publication')
+      .lean()
+      .exec()
+
+    log.debug(`fetched collection`, req.user)
+    res.json(topics)
+  }
+  catch (err) {
+    log.error(`${getCollection.name}: ${err.message}`, req.user)
+    res.status(500).send(err)
+  }
 }
 
-function getAdminTopics(req, res) {
-  TopicModel.find({})
-    .sort('publication sortIndex title')
-    .lean()
-    .then(topics => {
-      log.debug('fetched admin topics', req)
-      res.json(topics)
-    }, err => {
-      log.error(`get admin topics error ${err.message}`, req)
-      res.status(500).send(err)
-    })
+async function getPublication(req, res) {
+  const publication = req.params.pub
+
+  try {
+    const criterion = { type: 'article', publication }
+
+    const groups = auth.getGroupsForUser(req.user)
+    if (groups) {
+      criterion.groupName = { $in: groups }
+    }
+
+    const topics = await TopicModel.find(criterion)
+      .sort('sortIndex part title')
+      .lean()
+      .exec()
+
+    if (topics.length === 0) {
+      // no matching group or publication not found.
+      // treat as 'unauthorized' http error
+      return res.sendStatus(401)
+    }
+
+    log.debug(`${getPublication.name}: ${publication} (${topics.length} topics)`, req.user)
+    res.json(topics)
+  }
+  catch (err) {
+    log.error(`${getPublication.name}: ${publication} error ${err.message}`, req.user)
+    res.status(500).send(err)
+  }
 }
 
-function getAppTopics(req, res) {
-  const criterion = {
-    type: 'article'
+async function getAdminTopics(req, res) {
+  try {
+    const topics = await TopicModel.find({})
+      .sort('publication sortIndex title')
+      .lean()
+      .exec()
+    log.debug('fetched admin topics')
+    res.json(topics)
   }
-
-  let groups = getAuthorizedGroups(req.user)
-
-  if (groups) {
-    groups = groups.filter(groupName => groupName !== "public")
-    criterion.groupName = { $in: groups }
+  catch (err) {
+    log.error(`${getAdminTopics.name}:  error ${err.message}`, req.user)
+    res.status(500).send(err)
   }
-
-  TopicModel.find(criterion)
-    .sort('publication')
-    .lean()
-    .then(topics => {
-      log.debug(`fetched app topics (${topics.length})`, req)
-      res.json(topics)
-    }, err => {
-      log.error(`get app topics error ${err.message}`, req)
-      res.status(500).send(err)
-    })
 }
 
-function getGroupInfo(req, res) {
-  TopicModel.find({})
-    .sort('groupName')
-    .lean()
-    .then((topics) => {
-      const groupMap = new Map()
+async function getAppTopics(req, res) {
+  try {
+    const criterion = {
+      type: 'article'
+    }
 
-      topics.forEach(topic => {
-        let group = groupMap.get(topic.groupName)
-        if (!group) {
-          group = {
-            name: topic.groupName,
-            publications: new Set()
-          }
-          groupMap.set(topic.groupName, group)
+    let groups = auth.getGroupsForUser(req.user)
+    if (groups) {
+      groups = groups.filter(name => name !== 'public')
+      criterion.groupName = { $in: groups }
+    }
+
+    const topics = await TopicModel.find(criterion)
+      .sort('publication')
+      .lean()
+      .exec()
+
+    log.debug(`fetched app topics (${topics.length})`, req.user)
+    res.json(topics)
+  }
+  catch (err) {
+    log.error(`get app topics error ${err.message}`, req.user)
+    res.status(500).send(err)
+  }
+}
+
+async function getGroupInfo(req, res) {
+  try {
+    const topics = await TopicModel.find({})
+      .sort('groupName')
+      .lean()
+      .exec()
+
+    const groupMap = topics.reduce((map, topic) => {
+      let group = map.get(topic.groupName)
+      if (!group) {
+        group = {
+          name: topic.groupName,
+          publications: new Set()
         }
-        if (topic.publication) {
-          group.publications.add(topic.publication)
-        }
+        map.set(topic.groupName, group)
+      }
+      group.publications.add(topic.publication)
+      return map
+    }, new Map())
+
+    const groups = []
+
+    groupMap.forEach((group, name) => {
+      groups.push({
+        name,
+        publications: [...group.publications].join(', ')
       })
-
-      const groups = []
-
-      groupMap.forEach((group, name) => {
-        const items = []
-        group.publications.forEach(pubtitle => {
-          items.push(pubtitle)
-        })
-        groups.push({
-          name: name,
-          publications: items.join(', ')
-        })
-      })
-
-      log.debug('fetched group info', req)
-      res.json(groups)
-
-    }, err => {
-      log.error(`get group info error ${err.message}`, req)
-      res.status(500).send(err)
     })
+
+    log.debug('fetched group info', req.user)
+    res.json(groups)
+
+  }
+  catch (err) {
+    log.error(`get group info error ${err.message}`, req.user)
+    res.status(500).send(err)
+  }
 }
 
 module.exports = {
   getCollection,
-  getIndexTopics,
   getPublication,
-  getAuthorizedGroups,
   getAdminTopics,
   getAppTopics,
   getGroupInfo

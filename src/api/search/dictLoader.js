@@ -31,7 +31,7 @@ function createData(topic, uploadData) {
     return Promise.resolve()
   }
 
-  LemmaModel.collection.bulkWrite(ops)
+  return LemmaModel.collection.bulkWrite(ops)
     .then(() => autoCompleteIndexer())
 }
 

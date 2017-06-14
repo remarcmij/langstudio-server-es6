@@ -14,7 +14,7 @@ function rebuildAutoCompleteCollection() {
     .then(() => LemmaModel.distinct('lang'))
     .then(languages => {
       return ParagraphModel.distinct('wordLang')
-        .then(wordLanguages => _.uniq(languages.concat(wordLanguages)))
+        .then(wordLanguages => _.uniq([...languages, ...wordLanguages]))
     })
     .then(languages => {
       const promises = languages.map(lang => {

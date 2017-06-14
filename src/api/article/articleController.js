@@ -11,35 +11,36 @@ const CONTENT_MARKER_REGEXP = /<!-- flashcard -->|<!-- translate-start -->/
 
 const PUBLIC_GROUPS = ['public']
 
-function getArticle(req, res) {
+async function getArticle(req, res) {
 
-  ArticleModel.findOne({ fileName: req.params.filename })
-    .select('-indexText')
-    .lean()
-    .then(article => {
-      const highlightPhrase = req.query.q
+  try {
+    const article = await ArticleModel.findOne({ fileName: req.params.filename })
+      .select('-indexText')
+      .lean()
+      .exec()
 
-      if (highlightPhrase) {
-        // convert as a once-off including highlighting
-        const highlightText = highlightSearchText(article.mdText, highlightPhrase)
-        article.htmlText = markdownService.convertMarkdown(highlightText, true)
-      }
+    const highlightPhrase = req.query.q
 
-      // no need to send original text if it doesn't data
-      // required by the client
-      if (!CONTENT_MARKER_REGEXP.test(article.mdText)) {
-        article.mdText = ''
-      }
+    if (highlightPhrase) {
+      // convert as a once-off including highlighting
+      const highlightText = highlightSearchText(article.mdText, highlightPhrase)
+      article.htmlText = markdownService.convertMarkdown(highlightText, true)
+    }
 
-      log.info(`fetched article ${article.fileName}`, req)
+    // no need to send original text if it doesn't data
+    // required by the client
+    if (!CONTENT_MARKER_REGEXP.test(article.mdText)) {
+      article.mdText = ''
+    }
 
-      sendIfAuthorized(req, res, article)
+    log.info(`fetched article ${article.fileName}`, req.user)
 
-    })
-    .catch(err => {
-      log.error(`get article error ${err.message}`, req)
-      res.status(500).send(err.message)
-    })
+    sendIfAuthorized(req, res, article)
+  }
+  catch (err) {
+    log.error(`get article error ${err.message}`, req.user)
+    res.status(500).send(err.message)
+  }
 }
 
 function highlightSearchText(htmlIn, phrase) {
@@ -90,7 +91,7 @@ function highlightSearchText(htmlIn, phrase) {
 }
 
 function sendIfAuthorized(req, res, articleData) {
-  const groups = req.user ? req.user.groups.concat(PUBLIC_GROUPS) : PUBLIC_GROUPS
+  const groups = req.user ? [...req.user.groups, ...PUBLIC_GROUPS] : PUBLIC_GROUPS
   const isAdmin = req.user && req.user.role === 'admin'
 
   if (isAdmin || groups.indexOf(articleData.groupName) !== -1) {
@@ -103,35 +104,35 @@ function sendIfAuthorized(req, res, articleData) {
   }
 }
 
-function searchArticles(req, res) {
-
-  let phrase = req.query.q.trim()
-  if (!phrase.startsWith('"')) {
-    phrase = phrase.replace(/([-'\w]+)/g, '"$1"')
-  }
-
-  const condition = {
-    $text: {
-      $search: phrase
+async function searchArticles(req, res) {
+  try {
+    let phrase = req.query.q.trim()
+    if (!phrase.startsWith('"')) {
+      phrase = phrase.replace(/([-'\w]+)/g, '"$1"')
     }
+
+    const condition = {
+      $text: {
+        $search: phrase
+      }
+    }
+
+    const groups = getGroups(req.user)
+
+    if (groups) {
+      condition.groupName = { $in: groups }
+    }
+
+    const docs = await ArticleModel
+      .find(condition, { _topic: 1 })
+      .populate('_topic')
+      .lean()
+      .exec()
+    res.json(docs)
   }
-
-  const groups = getGroups(req.user)
-
-  if (groups) {
-    condition.groupName = { $in: groups }
+  catch (err) {
+    res.sendStatus(500)
   }
-
-  Promise.resolve(ArticleModel
-    .find(condition, { _topic: 1 })
-    .populate('_topic')
-    .lean())
-    .then(docs => {
-      res.json(docs)
-    })
-    .catch(() => {
-      res.sendStatus(500)
-    })
 }
 
 function getGroups(user) {
@@ -139,8 +140,7 @@ function getGroups(user) {
 
   if (user) {
     if (user.role !== 'admin') {
-      groups = user.groups
-      groups = _.uniq(groups.concat(PUBLIC_GROUPS))
+      groups = _.uniq([...user.groups, ...PUBLIC_GROUPS])
     }
   } else {
     groups = PUBLIC_GROUPS

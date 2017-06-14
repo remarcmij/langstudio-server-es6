@@ -62,6 +62,6 @@
     "node": ">=6.0.0"
   },
   "scripts": {
-    "start": "node src/app.js"
+    "start": "nodemon src/app.js"
   }
 }
