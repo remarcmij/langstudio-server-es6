@@ -7,7 +7,7 @@ const schema = new Schema({
   fileName: { type: String, required: true, unique: true },
   publication: String,
   chapter: String,
-  foreignLang: String,
+  targetLang: String,
   baseLang: String,
   groupName: { type: String, required: true },
   sortIndex: { type: Number, 'default': 0 },
@@ -18,7 +18,6 @@ const schema = new Schema({
   publisher: String,
   pubdate: String,
   isbn: String,
-  hash: String,
   lastModified: { type: Date, 'default': Date.now() }
 })
 

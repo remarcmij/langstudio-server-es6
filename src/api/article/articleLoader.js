@@ -1,6 +1,5 @@
 'use strict'
 const _ = require('lodash')
-const md5 = require('md5')
 const XRegExp = require('xregexp')
 
 const ArticleModel = require('./articleModel')
@@ -11,61 +10,43 @@ const autoCompleteIndexer = require('../search/autoCompleteIndexer')
 
 const WORD_REGEXP = XRegExp(String.raw`#?[-'\p{L}]{2,}`, 'g')
 
-function createData(topic, data) {
+async function createData(topic, data) {
   const article = data.payload
   article._topic = topic._id
 
-  let indexText = article.mdText
-
-  // strip off header section from index text
-  const match = indexText.match(/<\/section>/)
-  if (match) {
-    indexText = indexText.slice(match.index + match[0].length)
-  }
-
-  // remove all html tags from index text
-  indexText = indexText.replace(/<.+?>/g, '')
-  article.indexText = indexText
-
-  return ArticleModel.create(article)
-    .then(() => bulkWriteParagraphs(article, topic))
-    .then(() => autoCompleteIndexer())
+  await ArticleModel.create(article)
+  await bulkWriteParagraphs(article, topic)
+  await autoCompleteIndexer()
 }
 
-function bulkWriteParagraphs(article, topic) {
-  const ops = article.paragraphs.reduce((acc, paragraph) => {
-    paragraph.words.forEach(word => {
-      acc.push({
-        insertOne: {
-          document: {
-            word: word.word,
-            wordLang: word.lang,
-            content: paragraph.content,
-            baseLang: topic.baseLang,
-            targetLang: topic.foreignLang,
-            groupName: topic.groupName,
-            _topic: topic._id
-          }
+async function bulkWriteParagraphs(article, topic) {
+  const bulkOps = article.paragraphs.reduce((acc, paragraph) => {
+    const ops = paragraph.words.map(word => ({
+      insertOne: {
+        document: {
+          word: word.word,
+          wordLang: word.lang,
+          content: paragraph.content,
+          baseLang: topic.baseLang,
+          targetLang: topic.targetLang,
+          groupName: topic.groupName,
+          _topic: topic._id
         }
-      })
-    })
-    return acc
+      }
+    }))
+    return [...acc, ...ops]
   }, [])
 
-  if (ops.length === 0) {
-    return Promise.resolve()
+  if (bulkOps.length > 0) {
+    await ParagraphModel.collection.bulkWrite(bulkOps)
   }
-
-  return ParagraphModel.collection.bulkWrite(ops)
 }
 
-function removeData(topic) {
-  if (!topic) {
-    return Promise.resolve()
+async function removeData(topic) {
+  if (topic) {
+    await ArticleModel.remove({ _topic: topic._id }).exec()
+    await ParagraphModel.remove({ _topic: topic._id })
   }
-
-  return ArticleModel.remove({ _topic: topic._id }).exec()
-    .then(() => ParagraphModel.remove({ _topic: topic._id }))
 }
 
 function parseFile(content, fileName) {
@@ -112,7 +93,7 @@ function parseFile(content, fileName) {
     title,
     subtitle,
     type: 'article',
-    foreignLang: header.get('targetLang'),
+    targetLang: header.get('targetLang'),
     baseLang: header.get('baseLang'),
     groupName: header.get('groupName') || 'public',
     sortIndex: parseInt(header.get('sortOrder') || '0', 10),
@@ -130,9 +111,7 @@ function parseFile(content, fileName) {
     mdText: content
   }
 
-  topic.hash = md5(JSON.stringify({ topic, article }))
-
-  article.paragraphs = extractParagraphs(content, topic.baseLang, topic.foreignLang)
+  article.paragraphs = extractParagraphs(content, topic.baseLang, topic.targetLang)
 
   article.htmlText = markDownService.convertMarkdown(content, header.get('foreign-text') === 'true')
 

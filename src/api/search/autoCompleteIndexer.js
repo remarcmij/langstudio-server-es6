@@ -7,7 +7,7 @@ const ParagraphModel = require('../article/paragraphModel')
 const log = require('../../services/logService')
 const search = require('../search/search')
 
-const REBUILD_DELAY = 10000  // 10 secs
+const REBUILD_DELAY = 20000  // 20 secs
 
 function rebuildAutoCompleteCollection() {
   WordModel.remove({})

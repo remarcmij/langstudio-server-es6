@@ -1,164 +1,131 @@
 'use strict'
 
-const _ = require('lodash')
 const multiparty = require('multiparty')
 const fs = require('fs')
+const util = require('util')
 const path = require('path')
-const PubSub = require('pubsub-js')
 
 const TopicModel = require('./topicModel')
 const articleLoader = require('../article/articleLoader')
 const dictLoader = require('../search/dictLoader')
 const log = require('../../services/logService')
 const TaskQueue = require('../../components/utils/taskQueue')
-const AppConstants = require('../../config/appConstants')
+
+const readFile = util.promisify(fs.readFile)
+const unlink = util.promisify(fs.unlink)
 
 const CONCURRENCY = 2
-
 const taskQueue = new TaskQueue(CONCURRENCY)
 
 function getLoader(originalFilename) {
-
   if (/\.dict\.json$/.test(originalFilename)) {
     return dictLoader
   }
-
   if (/\.md$/.test(originalFilename)) {
     return articleLoader
   }
-
   throw new Error('unsupported file extension')
 }
 
-function updateTopic(data) {
+async function updateTopic(data) {
+  const { fileName } = data.topic
+  let topic = await TopicModel.findOne({ fileName }).exec()
+  if (topic) {
+    delete topic.targetLang
+    delete topic.baseLang
+    delete topic.part
+    delete topic.title
+    delete topic.sortIndex
+    delete topic.subtitle
+    delete topic.author
+    delete topic.copyright
+    delete topic.publisher
+    delete topic.pubDate
+    delete topic.isbn
+  } else {
+    topic = new TopicModel()
+  }
+  Object.assign(topic, data.topic)
+  topic.lastModified = Date.now()
+  return topic.save()
+}
 
-  return Promise.resolve(TopicModel.findOne({ fileName: data.topic.fileName }).exec())
-    .then(topic => {
-      // create a new Topic if no existing one found
-      if (topic) {
-        topic.groupName = 'public'
-        topic.foreignLang = undefined
-        topic.baseLang = undefined
-        topic.part = undefined
-        topic.title = undefined
-        topic.sortIndex = undefined
-        topic.subtitle = undefined
-        topic.author = undefined
-        topic.copyright = undefined
-        topic.publisher = undefined
-        topic.pubDate = undefined
-        topic.isbn = undefined
-        topic.hash = undefined
-      } else {
-        topic = new TopicModel()
-      }
+async function importFile(filePath, originalFilename) {
+  const loader = getLoader(originalFilename)
+  const content = await readFile(filePath, 'utf-8')
+  const uploadData = loader.parseFile(content, originalFilename)
+  const topic = await TopicModel.findOne({ fileName: originalFilename })
+  await loader.removeData(topic)
+  const updatedTopic = await updateTopic(uploadData)
+  await loader.createData(updatedTopic, uploadData)
+}
 
-      _.assign(topic, data.topic)
+async function removeTopic(req, res) {
+  try {
+    const fileName = req.params.filename
+    const topic = await TopicModel.findOne({ fileName }).exec()
+    const loader = topic.type === 'dict' ? dictLoader : articleLoader
+    await loader.removeData(topic)
+    await TopicModel.remove({ _id: topic._id }).exec()
+    res.sendStatus(204)
+  }
+  catch (err) {
+    res.status(404).send(err.message)
+  }
+}
 
-      topic.lastModified = Date.now()
+async function uploadFile(req, res) {
 
-      return new Promise((resolve, reject) => {
-        topic.save((err, savedTopic) => {
-          if (err) {
-            reject(err)
-          } else {
-            resolve(savedTopic)
-          }
-        })
+  const formParse = form => {
+    return new Promise((resolve, reject) => {
+      form.parse(req, (err, fields, files) => {
+        if (err) { return reject(err) }
+        resolve(files.file[0])
       })
     })
-}
+  }
 
-function createData(loader, topic, data) {
-  return loader.createData(topic, data)
-}
-
-function importFile(filePath, originalFilename) {
-
-  return new Promise((resolve, reject) => {
-    fs.readFile(filePath, 'utf-8', (err, content) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(content)
-      }
-    })
-  }).then(content => {
-    const loader = getLoader(originalFilename)
-    const uploadData = loader.parseFile(content, originalFilename)
-
-    return TopicModel.findOne({ fileName: originalFilename })
-      .then(topic => loader.removeData(topic))
-      .then(() => updateTopic(uploadData))
-      .then(updatedTopic => createData(loader, updatedTopic, uploadData))
-
-  })
-
-}
-
-function removeTopic(req, res) {
-  const fileName = req.params.filename
-
-  Promise.resolve(TopicModel.findOne({ fileName }).exec())
-    .then(topic => {
-      const loader = topic.type === 'dict' ? dictLoader : articleLoader
-
-      return loader.removeData(topic)
-        .then(() => {
-          return Promise.resolve(TopicModel.remove({ _id: topic._id }).exec())
-        })
-        .then(() => {
-          res.status(200).end()
-        })
-    })
-    .catch(err => {
-      res.status(404).send(err.message)
-    })
-}
-
-function uploadFile(req, res) {
-  new Promise((resolve, reject) => {
+  try {
     const uploadDir = path.join(__dirname, '../../../upload')
     const form = new multiparty.Form({ uploadDir: uploadDir, maxFilesSize: 10 * 1024 * 1024 })
-    form.parse(req, (err, fields, files) => {
-      if (err) {
-        reject(err)
-      } else {
-        resolve(files.file[0])
-      }
-    })
-  }).then(file => {
-    taskQueue.pushTask(() => {
-      return importFile(file.path, file.originalFilename)
-        .then(() => {
-          log.info(`file '${file.originalFilename}' uploaded succesfully`, req.user)
-          PubSub.publish(AppConstants.INVALIDATE_CACHES, null)
-          res.json({ fileName: file.originalFilename })
-        })
-        .catch(err => {
-          let message
-          if (err.name === 'ValidationError') {
-            message = err.toString()
-          } else {
-            message = err.message
-          }
-          log.error(`error uploading file '${file.originalFilename}': ${message}`, req.user)
-          res.status(400).send(JSON.stringify({
-            fileName: file.originalFilename,
-            message: message
-          }))
-        })
-        .then(() => {
-          fs.unlinkSync(file.path)
-        })
-    })
-  }).catch(err => {
+    const file = await formParse(form)
+    taskQueue.pushTask(() => importFileTask(req, res, file))
+  }
+  catch (err) {
     const status = err.message.indexOf('maxFilesSize') !== -1 ? 413 : 400
     res.writeHead(status, { 'content-type': 'text/plain', connection: 'close' })
     const response = status === 413 ? 'Request Entity Too Large' : 'Bad Request'
     res.end(response)
+  }
+}
 
-  })
+async function importFileTask(req, res, file) {
+  try {
+    await importFile(file.path, file.originalFilename)
+    log.info(`file '${file.originalFilename}' uploaded succesfully`, req.user)
+    res.json({ fileName: file.originalFilename })
+  }
+  catch (err) {
+    let message
+    if (err.name === 'ValidationError') {
+      message = err.toString()
+    } else {
+      message = err.message
+    }
+    log.error(`error uploading file '${file.originalFilename}': ${message}`, req.user)
+    res.status(400).send(JSON.stringify({
+      fileName: file.originalFilename,
+      message: message
+    }))
+  }
+  finally {
+    try {
+      await unlink(file.path)
+    }
+    catch (err) {
+      console.log('unlink failed')
+    }
+  }
 }
 
 module.exports = {

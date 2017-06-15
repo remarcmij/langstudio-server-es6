@@ -3,43 +3,38 @@
 const LemmaModel = require('./lemmaModel')
 const autoCompleteIndexer = require('./autoCompleteIndexer')
 
-function createData(topic, uploadData) {
+async function createData(topic, uploadData) {
 
-  const ops = uploadData.payload.lemmas.reduce((acc, lemma) => {
-    lemma.words.forEach(word => {
-      acc.push({
-        insertOne: {
-          document: {
-            baseWord: lemma.base,
-            homonym: lemma.homonym,
-            text: lemma.text,
-            word: word.word,
-            attr: word.attr,
-            order: word.order,
-            lang: word.lang,
-            baseLang: uploadData.payload.baseLang,
-            groupName: uploadData.topic.groupName,
-            _topic: topic._id
-          }
+  const bulkOps = uploadData.payload.lemmas.reduce((acc, lemma) => {
+    const ops = lemma.words.map(word => ({
+      insertOne: {
+        document: {
+          baseWord: lemma.base,
+          homonym: lemma.homonym,
+          text: lemma.text,
+          word: word.word,
+          attr: word.attr,
+          order: word.order,
+          lang: word.lang,
+          baseLang: uploadData.payload.baseLang,
+          groupName: uploadData.topic.groupName,
+          _topic: topic._id
         }
-      })
-    })
-    return acc
+      }
+    }))
+    return [...acc, ...ops]
   }, [])
 
-  if (ops.length === 0) {
-    return Promise.resolve()
+  if (bulkOps.length > 0) {
+    await LemmaModel.collection.bulkWrite(bulkOps)
+    await autoCompleteIndexer()
   }
-
-  return LemmaModel.collection.bulkWrite(ops)
-    .then(() => autoCompleteIndexer())
 }
 
-function removeData(topic) {
+async function removeData(topic) {
   if (topic) {
-    return Promise.resolve(LemmaModel.remove({ _topic: topic._id }).exec())
+     await LemmaModel.remove({ _topic: topic._id }).exec()
   }
-  return Promise.resolve()
 }
 
 function parseFile(content, fileName) {

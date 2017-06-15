@@ -29,7 +29,6 @@
     "passport-google-id-token": "^0.4.1",
     "passport-google-oauth": "latest",
     "passport-local": "^1.0.0",
-    "pubsub-js": "^1.5.6",
     "request": "^2.81.0",
     "serve-favicon": "^2.4.2",
     "serve-static": "^1.12.2",
