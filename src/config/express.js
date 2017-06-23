@@ -13,6 +13,7 @@ module.exports = app => {
   app.set('views', config.root + '/server/views')
   app.engine('html', require('ejs').renderFile)
   app.set('view engine', 'html')
+  app.use(require('cors')())
   app.use(require('compression')())
   app.use(bodyParser.urlencoded({ extended: false }))
   app.use(bodyParser.json())

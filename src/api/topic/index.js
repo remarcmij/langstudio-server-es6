@@ -4,10 +4,8 @@ const topicController = require('./topicController')
 const uploadController = require('./uploadController')
 const auth = require('../../auth/authService')
 
-router.get('/pub/:pub', topicController.getPublication)
-router.get('/pub', topicController.getCollection)
-router.get('/auth/:pub', auth.authGuard(), topicController.getPublication)
-router.get('/auth', auth.authGuard(), topicController.getCollection)
+router.get('/:pub', auth.authGuard(), topicController.getPublication)
+router.get('', auth.authGuard(), topicController.getCollection)
 
 router.get('/app', auth.authGuard(), topicController.getAppTopics)
 router.get('/admin', auth.hasRole('admin'), topicController.getAdminTopics)

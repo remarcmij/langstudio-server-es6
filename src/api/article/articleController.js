@@ -9,6 +9,7 @@ async function getArticle(req, res) {
 
   try {
     const article = await ArticleModel.findOne({ fileName: req.params.filename })
+      .populate('_topic')
       .lean()
       .exec()
 

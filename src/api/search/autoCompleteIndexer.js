@@ -9,49 +9,40 @@ const search = require('../search/search')
 
 const REBUILD_DELAY = 20000  // 20 secs
 
-function rebuildAutoCompleteCollection() {
-  WordModel.remove({})
-    .then(() => LemmaModel.distinct('lang'))
-    .then(languages => {
-      return ParagraphModel.distinct('wordLang')
-        .then(wordLanguages => _.uniq([...languages, ...wordLanguages]))
+async function rebuildForLang(lang) {
+  const lemmaWords = await LemmaModel.distinct('word', { lang }).exec()
+  const paraWords = await ParagraphModel.distinct('word', { wordLang: lang }).exec()
+  return new Set([...lemmaWords, ...paraWords])
+}
+
+async function rebuildAutoCompleteCollection() {
+  try {
+    await WordModel.remove({}).exec()
+    const lemmaLangs = await LemmaModel.distinct('lang').exec()
+    const paraLangs = await ParagraphModel.distinct('wordLang').exec()
+    const langs = _.uniq([...lemmaLangs, ...paraLangs])
+
+    const promises = langs.map(async function (lang) {
+      const wordSet = await rebuildForLang(lang)
+      return { lang, wordSet }
     })
-    .then(languages => {
-      const promises = languages.map(lang => {
-        return LemmaModel.distinct('word', { lang })
-          .then(words => {
-            const wordSet = new Set(words)
-            return ParagraphModel.distinct('word', {wordLang: lang})
-            .then(words => {
-              for (const word of words) {
-                wordSet.add(word)
-              }
-              return {lang, wordSet}
-            })
-          })
-      })
-      return Promise.all(promises)
-    })
-    .then(results => {
-      const ops = results.reduce((acc, result) => {
-        result.wordSet.forEach(word => {
-          acc.push({
-            insertOne: {
-              document: {
-                word,
-                lang: result.lang
-              }
-            }
-          })
-        })
-        return acc
-      }, [])
-      return WordModel.collection.bulkWrite(ops)
-    })
-    .then(() => {
-      search.clearAutoCompleteCache()
-      log.info(`auto-complete collection rebuilt`)
-    })
+    const results = await Promise.all(promises)
+
+    const bulkOps = results.reduce((acc, result) => {
+      const { lang, wordSet } = result
+      const ops = [...wordSet].map(word => ({
+        insertOne: { document: { word, lang } }
+      }))
+      return [...acc, ...ops]
+    }, [])
+    await WordModel.collection.bulkWrite(bulkOps)
+
+    search.clearAutoCompleteCache()
+    log.info(`auto-complete collection rebuilt`)
+  }
+  catch (err) {
+    log.error(`Error rebuilding auto-complete collection: ${err.message}`)
+  }
 }
 
 module.exports = _.debounce(rebuildAutoCompleteCollection, REBUILD_DELAY)

@@ -28,8 +28,8 @@ function authGuard() {
     .use((req, res, next) => {
       UserModel.findById(req.user._id, (err, user) => {
         if (err) return next(err)
-        if (!user) return res.sendStatus(401)
-        if (user.disabled) return res.status(401).send('account disabled')
+        // if (!user) return res.sendStatus(401)
+        // if (user.disabled) return res.status(401).send('account disabled')
         req.user = user
         next()
       })
