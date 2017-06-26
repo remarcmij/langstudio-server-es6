@@ -15,24 +15,35 @@ const EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60  // days * hours/day * minutes/hour
  * Otherwise returns 403
  */
 function authGuard() {
+
+  const getAutorizationHeader = (req) =>
+    req.headers['authorization'] || req.headers['Authorization']
+
   return compose()
     // Validate jwt
     .use(function (req, res, next) {
+      const { query, headers } = req
       // allow the access token to be passed through query parameter as well
-      if (req.query && req.query.hasOwnProperty('auth')) {
-        req.headers['authorization'] = 'Bearer ' + req.query['auth']
+      if (query && query.hasOwnProperty('auth')) {
+        headers['authorization'] = 'Bearer ' + query['auth']
       }
-      validateJwt(req, res, next)
+      if (getAutorizationHeader(req)) {
+        validateJwt(req, res, next)
+      } else {
+        next()
+      }
     })
     // Attach user to request
     .use((req, res, next) => {
-      UserModel.findById(req.user._id, (err, user) => {
-        if (err) return next(err)
-        // if (!user) return res.sendStatus(401)
-        // if (user.disabled) return res.status(401).send('account disabled')
-        req.user = user
+      if (getAutorizationHeader(req)) {
+        UserModel.findById(req.user._id, (err, user) => {
+          if (err) return next(err)
+          req.user = user
+          next()
+        })
+      } else {
         next()
-      })
+      }
     })
 }
 
