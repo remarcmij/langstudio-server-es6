@@ -1,5 +1,6 @@
 'use strict'
 const _ = require('lodash')
+const fp = require('lodash/fp')
 
 const ParagraphModel = require('../article/paragraphModel')
 const log = require('../../services/logService')
@@ -7,30 +8,31 @@ const auth = require('../../auth/authService')
 
 const CHUNK_SIZE = 50
 
+const uniqByTopic = fp.uniqBy(doc => doc._topic)
+
 async function search(req, res) {
+  const { query, user } = req
+  const { word, lang, chunk = 0 } = query
+
   try {
-    const condition = { word: req.query.word, wordLang: req.query.lang }
-    const chunk = parseInt(req.query.chunk || '0', 10)
-
-    const groups = auth.getGroupsForUser(req.user)
-
-    if (groups) {
-      condition.groupName = { $in: groups }
-    }
+    const condition = auth.prepareQueryConditionForUser({
+      word,
+      wordLang: lang
+    }, user)
 
     const docs = await ParagraphModel
       .find(condition)
-      .skip(CHUNK_SIZE * (chunk || 0))
+      .skip(CHUNK_SIZE * (+chunk))
       .limit(CHUNK_SIZE)
       .lean()
       .exec()
 
     const haveMore = docs.length === CHUNK_SIZE
-    const paragraphs = _.uniqBy(docs, doc => doc._topic)
+    const paragraphs = uniqByTopic(docs)
     res.json({ paragraphs, haveMore })
   }
   catch (err) {
-    log.error(`search: '${req.query.word}', error: ${err.message}`, req.user)
+    log.error(`search: '${word}', error: ${err.message}`, user)
     res.status(500).send(err.message)
   }
 }
