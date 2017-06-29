@@ -10,7 +10,9 @@
       "name": "Launch server",
       "program": "${workspaceRoot}/src/app.js",
       "cwd": "${workspaceRoot}",
-      "protocol": "inspector"
+      "protocol": "inspector",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
     }
   ]
 }
