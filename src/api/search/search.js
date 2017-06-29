@@ -17,38 +17,6 @@ const autoCompleteCache = LRU({
   maxAge: 1000 * 60 * 60
 })
 
-async function paraSearch(req, res) {
-  const term = req.query.term
-
-  try {
-    const chunk = parseInt(req.query.chunk || '0', 10)
-
-    const condition = {
-      word: { $regex: '^' + term }
-    }
-
-    const groups = auth.getGroupsForUser(req.user)
-    if (groups) {
-      condition.groupName = { $in: groups }
-    }
-
-    const docs = await ParagraphModel
-      .find(condition)
-      .skip(CHUNK_SIZE * (chunk || 0))
-      .limit(CHUNK_SIZE)
-      .lean()
-      .exec()
-
-    const haveMore = docs.length === CHUNK_SIZE
-    const paragraphs = _.uniqBy(docs, doc => doc._topic)
-    res.json({ paragraphs, haveMore })
-  }
-  catch (err) {
-    log.error(`search: '${term}', error: ${err.message}`, req.user)
-    res.status(500).send(err.message)
-  }
-}
-
 async function dictSearch(req, res) {
   const words = req.query.word.split(',')
 
@@ -154,7 +122,6 @@ function clearAutoCompleteCache() {
 }
 
 module.exports = {
-  paraSearch,
   dictSearch,
   autoCompleteSearch,
   clearAutoCompleteCache
