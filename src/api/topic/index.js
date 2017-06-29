@@ -4,13 +4,13 @@ const topicController = require('./topicController')
 const uploadController = require('./uploadController')
 const auth = require('../../auth/authService')
 
+router.get('/groups', topicController.getGroupInfo)
+router.get('/app', auth.authGuard(), topicController.getAppTopics)
+router.get('/admin', auth.roleGuard('admin'), topicController.getAdminTopics)
+router.delete('/admin/:filename', auth.roleGuard('admin'), uploadController.removeTopic)
 router.get('/:pub', auth.authGuard(), topicController.getPublication)
 router.get('', auth.authGuard(), topicController.getCollection)
 
-router.get('/app', auth.authGuard(), topicController.getAppTopics)
-router.get('/admin', auth.hasRole('admin'), topicController.getAdminTopics)
-router.delete('/admin/:filename', auth.hasRole('admin'), uploadController.removeTopic)
-router.get('/groups', topicController.getGroupInfo)
-router.post('/', auth.hasRole('admin'), uploadController.uploadFile)
+router.post('/', auth.roleGuard('admin'), uploadController.uploadFile)
 
 module.exports = router
