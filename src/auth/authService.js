@@ -10,6 +10,9 @@ const config = require('../config/environment')
 const validateJwt = expressJwt({ secret: config.secrets.session })
 const EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60  // days * hours/day * minutes/hour * seconds/minute
 
+const hasRole = role => user => user.role === role
+const hasAdminRole = hasRole('admin')
+
 /**
  * Attaches the user object to the request if authenticated
  * Otherwise returns 403
@@ -50,7 +53,7 @@ function authGuard() {
 /**
  * Checks if the user role meets the minimum requirements of the route
  */
-function hasRole(role) {
+function roleGuard(role) {
   if (!role) throw new Error('Required role needs to be set')
 
   return compose()
@@ -102,6 +105,16 @@ function setTokenCookie(req, res) {
   res.redirect('/')
 }
 
+function prepareQueryConditionForUser(query, user) {
+  const groupClauseForUser = user =>
+    hasAdminRole(user) ? {} : {
+      groupName: { $in: _.uniq([...user.groups, 'public']) }
+    }
+
+  const groupClause = user ? groupClauseForUser(user) : { groupName: 'public' }
+  return Object.assign({}, query, groupClause)
+}
+
 function getGroupsForUser(user) {
   const publicGroups = ['public']
   let groups = []
@@ -120,9 +133,10 @@ function getGroupsForUser(user) {
 
 module.exports = {
   authGuard,
-  hasRole,
+  roleGuard,
   hasProvider,
   signToken,
   setTokenCookie,
-  getGroupsForUser
+  getGroupsForUser,
+  prepareQueryConditionForUser
 }

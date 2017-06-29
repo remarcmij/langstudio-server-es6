@@ -4,40 +4,39 @@ const log = require('../../services/logService')
 const auth = require('../../auth/authService')
 
 async function getCollection(req, res) {
+  const { user } = req
+
   try {
-    const criterion = { type: 'article', chapter: 'index' }
+    const condition = auth.prepareQueryConditionForUser({
+      type: 'article',
+      chapter: 'index'
+    }, user)
 
-    const groups = auth.getGroupsForUser(req.user)
-    if (groups) {
-      criterion.groupName = { $in: groups }
-    }
-
-    const topics = await TopicModel.find(criterion)
+    const topics = await TopicModel.find(condition)
       .sort('publication')
       .lean()
       .exec()
 
-    log.debug(`fetched collection`, req.user)
+    log.debug(`fetched collection`, user)
     res.json(topics)
   }
   catch (err) {
-    log.error(`${getCollection.name}: ${err.message}`, req.user)
+    log.error(`${getCollection.name}: ${err.message}`, user)
     res.status(500).send(err)
   }
 }
 
 async function getPublication(req, res) {
-  const publication = req.params.pub
+  const { user, params } = req
+  const { pub } = params
 
   try {
-    const criterion = { type: 'article', publication }
+    const condition = auth.prepareQueryConditionForUser({
+      type: 'article',
+      publication: pub
+    }, user)
 
-    const groups = auth.getGroupsForUser(req.user)
-    if (groups) {
-      criterion.groupName = { $in: groups }
-    }
-
-    const topics = await TopicModel.find(criterion)
+    const topics = await TopicModel.find(condition)
       .sort('sortIndex part title')
       .lean()
       .exec()
@@ -48,11 +47,11 @@ async function getPublication(req, res) {
       return res.sendStatus(401)
     }
 
-    log.debug(`${getPublication.name}: ${publication} (${topics.length} topics)`, req.user)
+    log.debug(`${getPublication.name}: ${pub} (${topics.length} topics)`, user)
     res.json(topics)
   }
   catch (err) {
-    log.error(`${getPublication.name}: ${publication} error ${err.message}`, req.user)
+    log.error(`${getPublication.name}: ${pub} error ${err.message}`, user)
     res.status(500).send(err)
   }
 }
@@ -73,27 +72,22 @@ async function getAdminTopics(req, res) {
 }
 
 async function getAppTopics(req, res) {
+  const { user } = req
   try {
-    const criterion = {
+    const condition = auth.prepareQueryConditionForUser({
       type: 'article'
-    }
+    }, user)
 
-    let groups = auth.getGroupsForUser(req.user)
-    if (groups) {
-      groups = groups.filter(name => name !== 'public')
-      criterion.groupName = { $in: groups }
-    }
-
-    const topics = await TopicModel.find(criterion)
+    const topics = await TopicModel.find(condition)
       .sort('publication')
       .lean()
       .exec()
 
-    log.debug(`fetched app topics (${topics.length})`, req.user)
+    log.debug(`fetched app topics (${topics.length})`, user)
     res.json(topics)
   }
   catch (err) {
-    log.error(`get app topics error ${err.message}`, req.user)
+    log.error(`get app topics error ${err.message}`, user)
     res.status(500).send(err)
   }
 }
