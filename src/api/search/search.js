@@ -1,5 +1,6 @@
 'use strict'
 const fp = require('lodash/fp')
+const reduce = require('lodash/reduce')
 const LRU = require('lru-cache')
 const XRegExp = require('xregexp')
 
@@ -20,39 +21,29 @@ const autoCompleteCache = LRU({
   maxAge: 1000 * 60 * 60
 })
 
-async function dictSearch(req, res) {
+function searchFirstMatching(words, callback) {
+  return reduce(words, (promise, word) => {
+    return promise
+      .then(docs => docs.length > 0 ? docs : callback(word))
+  }, Promise.resolve([]))
+}
 
+async function dictSearch(req, res) {
   const { query, user } = req
   const { word, lang, attr, chunk = 0 } = query
   const words = word.split(',')
 
-  const searchFunctions = words.map(word => {
-    return docs => {
-      // return the result if something found from
-      // previous promise
-      if (docs.length > 0) {
-        return docs
-      }
+  const searchWord = word => {
+    const condition = fp.flow(
+      wordLangCondition(word, lang),
+      attrCondition(attr),
+      auth.userGroupsCondition(user)
+    )({})
+    return execSearch(condition, +chunk)
+  }
 
-      const condition = fp.flow(
-        wordLangCondition(word, lang),
-        attrCondition(attr),
-        auth.userGroupsCondition(user)
-      )({})
-
-      return execSearch(condition, +chunk)
-    }
-  })
-
-  let lookupPromise = Promise.resolve([])
-
-  searchFunctions.forEach(lookupFunction => {
-    lookupPromise = lookupPromise.then(lookupFunction)
-  })
-
-  // handle result of final promise
   try {
-    const docs = await lookupPromise
+    const docs = await searchFirstMatching(words, searchWord)
     const haveMore = docs.length === CHUNK_SIZE
     const lemmas = uniqByText(docs)
     res.json({ lemmas, haveMore })
@@ -64,7 +55,6 @@ async function dictSearch(req, res) {
 }
 
 function execSearch(condition, chunk) {
-
   let query = LemmaModel
     .find(condition)
     .sort('word order')
