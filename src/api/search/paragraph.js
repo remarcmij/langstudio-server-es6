@@ -15,10 +15,10 @@ async function search(req, res) {
   const { word, lang, chunk = 0 } = query
 
   try {
-    const condition = auth.prepareQueryConditionForUser({
+    const condition = auth.addUserGroupsToQueryCondition(user, {
       word,
       wordLang: lang
-    }, user)
+    })
 
     const docs = await ParagraphModel
       .find(condition)

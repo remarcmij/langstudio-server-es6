@@ -1,16 +1,27 @@
 'use strict'
+const fp = require('lodash/fp')
 const TopicModel = require('./topicModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
+
+const userGroupsCondition = fp.curry(auth.addUserGroupsToQueryCondition)
+const articleCondition = (pub) => (condition) => Object.assign({}, condition, { type: 'article', publication: pub })
+
+const cond = {
+  userGroups: fp.curry(auth.addUserGroupsToQueryCondition),
+  publication: (condition) => Object.assign({}, condition, { type: 'article', publication: 'index' }),
+  article: (pub) => (condition) => Object.assign({}, condition, { type: 'article', publication: pub }),
+  app: (condition) => Object.assign({}, condition, { type: 'article' }),
+}
 
 async function getCollection(req, res) {
   const { user } = req
 
   try {
-    const condition = auth.prepareQueryConditionForUser({
+    const condition = auth.addUserGroupsToQueryCondition(user, {
       type: 'article',
       chapter: 'index'
-    }, user)
+    })
 
     const topics = await TopicModel.find(condition)
       .sort('publication')
@@ -31,10 +42,10 @@ async function getPublication(req, res) {
   const { pub } = params
 
   try {
-    const condition = auth.prepareQueryConditionForUser({
+    const condition = auth.addUserGroupsToQueryCondition(user, {
       type: 'article',
       publication: pub
-    }, user)
+    })
 
     const topics = await TopicModel.find(condition)
       .sort('sortIndex part title')
@@ -74,9 +85,9 @@ async function getAdminTopics(req, res) {
 async function getAppTopics(req, res) {
   const { user } = req
   try {
-    const condition = auth.prepareQueryConditionForUser({
+    const condition = auth.addUserGroupsToQueryCondition(user, {
       type: 'article'
-    }, user)
+    })
 
     const topics = await TopicModel.find(condition)
       .sort('publication')

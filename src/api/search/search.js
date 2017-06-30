@@ -1,11 +1,10 @@
 'use strict'
-const _ = require('lodash')
+const fp = require('lodash/fp')
 const LRU = require('lru-cache')
 const XRegExp = require('xregexp')
 
 const LemmaModel = require('./lemmaModel')
 const WordModel = require('./wordModel')
-const ParagraphModel = require('../article/paragraphModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
 
@@ -18,9 +17,10 @@ const autoCompleteCache = LRU({
 })
 
 async function dictSearch(req, res) {
-  const words = req.query.word.split(',')
 
-  const groups = auth.getGroupsForUser(req.user)
+  const { query, user } = req
+  const { word, lang, attr, chunk = 0 } = query
+  const words = word.split(',')
 
   const searchFunctions = words.map(word => {
     return docs => {
@@ -29,15 +29,13 @@ async function dictSearch(req, res) {
       if (docs && docs.length !== 0) {
         return docs
       }
-      // return promise for next iteration
-      const searchRequest = {
-        word: word,
-        attr: req.query.attr,
-        chunk: parseInt(req.query.chunk || '0', 10),
-        lang: req.query.lang,
-        groups: groups
-      }
-      return doSearch(searchRequest)
+
+      const attrCondition = attr === 'k' ? { attr } : {}
+      const condition = auth.addUserGroupsToQueryCondition(user,
+        Object.assign({ word, lang }, attrCondition),
+      )
+
+      return execSearch(condition, +chunk)
     }
   })
 
@@ -48,45 +46,33 @@ async function dictSearch(req, res) {
   })
 
   // handle result of final promise
-  lookupPromise
-    .then(docs => {
-      const haveMore = docs.length === CHUNK_SIZE
-      const lemmas = _.uniqBy(docs, doc => doc.text)
-      res.json({ lemmas, haveMore })
-    })
-    .catch(err => {
-      log.error(`search: '${req.params.word}', error: ${err.message}`, req.user)
-      res.status(500).send(err.message)
-    })
+  try {
+    const docs = await lookupPromise
+    const haveMore = docs.length === CHUNK_SIZE
+    const lemmas = fp.uniqBy(doc => doc.text)(docs)
+    res.json({ lemmas, haveMore })
+  }
+  catch (err) {
+    log.error(`search: '${req.params.word}', error: ${err.message}`, user)
+    res.status(500).send(err.message)
+  }
 }
 
-function doSearch(sr) {
-
-  const condition = {
-    word: sr.word,
-  }
-
-  if (sr.attr === 'k') {
-    condition.attr = 'k'
-  }
-
-  if (sr.lang) {
-    condition.lang = sr.lang
-  }
-
-  if (sr.groups) {
-    condition.groupName = { $in: sr.groups }
-  }
+function execSearch(condition, chunk) {
 
   let query = LemmaModel
     .find(condition)
     .sort('word order')
 
-  if (sr.chunk !== -1) {
-    query = query.skip(CHUNK_SIZE * (sr.chunk || 0)).limit(CHUNK_SIZE)
+  if (chunk !== -1) {
+    query = query
+      .skip(CHUNK_SIZE * (chunk || 0))
+      .limit(CHUNK_SIZE)
   }
 
-  return query.lean().exec()
+  return query
+    .lean()
+    .exec()
 }
 
 async function autoCompleteSearch(req, res) {

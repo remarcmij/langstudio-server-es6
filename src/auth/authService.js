@@ -19,7 +19,7 @@ const hasAdminRole = hasRole('admin')
  */
 function authGuard() {
 
-  const getAutorizationHeader = (req) =>
+  const getAuthorizationHeader = (req) =>
     req.headers['authorization'] || req.headers['Authorization']
 
   return compose()
@@ -30,7 +30,7 @@ function authGuard() {
       if (query && query.hasOwnProperty('auth')) {
         headers['authorization'] = 'Bearer ' + query['auth']
       }
-      if (getAutorizationHeader(req)) {
+      if (getAuthorizationHeader(req)) {
         validateJwt(req, res, next)
       } else {
         next()
@@ -38,7 +38,7 @@ function authGuard() {
     })
     // Attach user to request
     .use((req, res, next) => {
-      if (getAutorizationHeader(req)) {
+      if (getAuthorizationHeader(req)) {
         UserModel.findById(req.user._id, (err, user) => {
           if (err) return next(err)
           req.user = user
@@ -105,7 +105,7 @@ function setTokenCookie(req, res) {
   res.redirect('/')
 }
 
-function prepareQueryConditionForUser(query, user) {
+function addUserGroupsToQueryCondition(user, query) {
   const groupClauseForUser = user =>
     hasAdminRole(user) ? {} : {
       groupName: { $in: _.uniq([...user.groups, 'public']) }
@@ -115,28 +115,11 @@ function prepareQueryConditionForUser(query, user) {
   return Object.assign({}, query, groupClause)
 }
 
-function getGroupsForUser(user) {
-  const publicGroups = ['public']
-  let groups = []
-
-  if (user) {
-    if (user.role === 'admin') {
-      return null
-    }
-    groups = _.uniq([...user.groups, ...publicGroups])
-  } else {
-    groups = publicGroups
-  }
-
-  return groups
-}
-
 module.exports = {
   authGuard,
   roleGuard,
   hasProvider,
   signToken,
   setTokenCookie,
-  getGroupsForUser,
-  prepareQueryConditionForUser
+  addUserGroupsToQueryCondition
 }
