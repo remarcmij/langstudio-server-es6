@@ -1,7 +1,7 @@
 'use strict'
 const jwt = require('jsonwebtoken')
 const expressJwt = require('express-jwt')
-const _ = require('lodash')
+const fp = require('lodash/fp')
 const compose = require('composable-middleware')
 
 const UserModel = require('../api/user/userModel')
@@ -9,9 +9,6 @@ const config = require('../config/environment')
 
 const validateJwt = expressJwt({ secret: config.secrets.session })
 const EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60  // days * hours/day * minutes/hour * seconds/minute
-
-const hasRole = role => user => user.role === role
-const hasAdminRole = hasRole('admin')
 
 /**
  * Attaches the user object to the request if authenticated
@@ -105,15 +102,14 @@ function setTokenCookie(req, res) {
   res.redirect('/')
 }
 
-function addUserGroupsToQueryCondition(user, query) {
-  const groupClauseForUser = user =>
-    hasAdminRole(user) ? {} : {
-      groupName: { $in: _.uniq([...user.groups, 'public']) }
-    }
-
-  const groupClause = user ? groupClauseForUser(user) : { groupName: 'public' }
-  return Object.assign({}, query, groupClause)
-}
+const userGroupsCondition = fp.curry((user, condition) => {
+  const hasRole = role => user => user.role === role
+  const anonymous = () => ({ groupName: 'public' })
+  const authenticated = user => hasRole('admin')(user) ? {} :
+    { groupName: { $in: fp.uniq([...user.groups, 'public']) } }
+  const groups = (user => user ? authenticated(user) : anonymous())(user)
+  return Object.assign({}, condition, groups)
+})
 
 module.exports = {
   authGuard,
@@ -121,5 +117,5 @@ module.exports = {
   hasProvider,
   signToken,
   setTokenCookie,
-  addUserGroupsToQueryCondition
+  userGroupsCondition
 }

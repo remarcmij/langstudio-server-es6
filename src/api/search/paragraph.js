@@ -1,5 +1,4 @@
 'use strict'
-const _ = require('lodash')
 const fp = require('lodash/fp')
 
 const ParagraphModel = require('../article/paragraphModel')
@@ -9,16 +8,17 @@ const auth = require('../../auth/authService')
 const CHUNK_SIZE = 50
 
 const uniqByTopic = fp.uniqBy(doc => doc._topic)
+const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, wordLang: lang })
 
 async function search(req, res) {
   const { query, user } = req
   const { word, lang, chunk = 0 } = query
 
   try {
-    const condition = auth.addUserGroupsToQueryCondition(user, {
-      word,
-      wordLang: lang
-    })
+    const condition = fp.flow(
+      wordLangCondition(word, lang),
+      auth.userGroupsCondition(user)
+    )({})
 
     const docs = await ParagraphModel
       .find(condition)

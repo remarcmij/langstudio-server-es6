@@ -11,6 +11,10 @@ const auth = require('../../auth/authService')
 const VALID_AUTOCOMPLETE_TEXT = XRegExp('^[-\'()\\p{L}]+$')
 const CHUNK_SIZE = 50
 
+const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, lang })
+const attrCondition = attr => condition => Object.assign({}, condition, attr === 'k' ? { attr } : {})
+const uniqByText = fp.uniqBy(doc => doc.text)
+
 const autoCompleteCache = LRU({
   max: 500,
   maxAge: 1000 * 60 * 60
@@ -26,14 +30,15 @@ async function dictSearch(req, res) {
     return docs => {
       // return the result if something found from
       // previous promise
-      if (docs && docs.length !== 0) {
+      if (docs.length > 0) {
         return docs
       }
 
-      const attrCondition = attr === 'k' ? { attr } : {}
-      const condition = auth.addUserGroupsToQueryCondition(user,
-        Object.assign({ word, lang }, attrCondition),
-      )
+      const condition = fp.flow(
+        wordLangCondition(word, lang),
+        attrCondition(attr),
+        auth.userGroupsCondition(user)
+      )({})
 
       return execSearch(condition, +chunk)
     }
@@ -49,12 +54,12 @@ async function dictSearch(req, res) {
   try {
     const docs = await lookupPromise
     const haveMore = docs.length === CHUNK_SIZE
-    const lemmas = fp.uniqBy(doc => doc.text)(docs)
+    const lemmas = uniqByText(docs)
     res.json({ lemmas, haveMore })
   }
-  catch (err) {
-    log.error(`search: '${req.params.word}', error: ${err.message}`, user)
-    res.status(500).send(err.message)
+  catch ({ message }) {
+    log.error(`search: '${req.params.word}', error: ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
@@ -76,7 +81,8 @@ function execSearch(condition, chunk) {
 }
 
 async function autoCompleteSearch(req, res) {
-  const term = req.query.term.trim()
+  let { term } = req.query
+  term = term.trim()
 
   if (term.length === 0 || !VALID_AUTOCOMPLETE_TEXT.test(term)) {
     return void res.json([])
@@ -98,8 +104,8 @@ async function autoCompleteSearch(req, res) {
     log.silly(`cache store for '${term}'`)
     res.json(items)
   }
-  catch (err) {
-    res.sendStatus(500)
+  catch ({ message }) {
+    res.sendStatus(500).send(message)
   }
 }
 

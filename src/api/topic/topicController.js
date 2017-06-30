@@ -4,24 +4,18 @@ const TopicModel = require('./topicModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
 
-const userGroupsCondition = fp.curry(auth.addUserGroupsToQueryCondition)
-const articleCondition = (pub) => (condition) => Object.assign({}, condition, { type: 'article', publication: pub })
-
-const cond = {
-  userGroups: fp.curry(auth.addUserGroupsToQueryCondition),
-  publication: (condition) => Object.assign({}, condition, { type: 'article', publication: 'index' }),
-  article: (pub) => (condition) => Object.assign({}, condition, { type: 'article', publication: pub }),
-  app: (condition) => Object.assign({}, condition, { type: 'article' }),
-}
+const indexCondition = condition => Object.assign({}, condition, { type: 'article', chapter: 'index' })
+const articleCondition = pub => condition => Object.assign({}, condition, { type: 'article', publication: pub })
+const appCondition = condition => Object.assign({}, condition, { type: 'article' })
 
 async function getCollection(req, res) {
   const { user } = req
 
   try {
-    const condition = auth.addUserGroupsToQueryCondition(user, {
-      type: 'article',
-      chapter: 'index'
-    })
+    const condition = fp.flow(
+      indexCondition,
+      auth.userGroupsCondition(user),
+    )({})
 
     const topics = await TopicModel.find(condition)
       .sort('publication')
@@ -31,9 +25,9 @@ async function getCollection(req, res) {
     log.debug(`fetched collection`, user)
     res.json(topics)
   }
-  catch (err) {
-    log.error(`${getCollection.name}: ${err.message}`, user)
-    res.status(500).send(err)
+  catch ({ message }) {
+    log.error(`${getCollection.name}: ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
@@ -42,10 +36,10 @@ async function getPublication(req, res) {
   const { pub } = params
 
   try {
-    const condition = auth.addUserGroupsToQueryCondition(user, {
-      type: 'article',
-      publication: pub
-    })
+    const condition = fp.flow(
+      articleCondition(pub),
+      auth.userGroupsCondition(user)
+    )({})
 
     const topics = await TopicModel.find(condition)
       .sort('sortIndex part title')
@@ -61,9 +55,9 @@ async function getPublication(req, res) {
     log.debug(`${getPublication.name}: ${pub} (${topics.length} topics)`, user)
     res.json(topics)
   }
-  catch (err) {
-    log.error(`${getPublication.name}: ${pub} error ${err.message}`, user)
-    res.status(500).send(err)
+  catch ({ message }) {
+    log.error(`${getPublication.name}: ${pub} error ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
@@ -76,18 +70,20 @@ async function getAdminTopics(req, res) {
     log.debug('fetched admin topics')
     res.json(topics)
   }
-  catch (err) {
-    log.error(`${getAdminTopics.name}:  error ${err.message}`, req.user)
-    res.status(500).send(err)
+  catch ({ message }) {
+    const { user } = req
+    log.error(`${getAdminTopics.name}:  error ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
 async function getAppTopics(req, res) {
   const { user } = req
   try {
-    const condition = auth.addUserGroupsToQueryCondition(user, {
-      type: 'article'
-    })
+    const condition = fp.flow(
+      appCondition,
+      auth.userGroupsCondition(user)
+    )({})
 
     const topics = await TopicModel.find(condition)
       .sort('publication')
@@ -97,9 +93,9 @@ async function getAppTopics(req, res) {
     log.debug(`fetched app topics (${topics.length})`, user)
     res.json(topics)
   }
-  catch (err) {
-    log.error(`get app topics error ${err.message}`, user)
-    res.status(500).send(err)
+  catch ({ message }) {
+    log.error(`get app topics error ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
@@ -136,9 +132,10 @@ async function getGroupInfo(req, res) {
     res.json(groups)
 
   }
-  catch (err) {
-    log.error(`get group info error ${err.message}`, req.user)
-    res.status(500).send(err)
+  catch ({ message }) {
+    const { user } = req
+    log.error(`get group info error ${message}`, user)
+    res.status(500).send(message)
   }
 }
 
