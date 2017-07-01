@@ -12,7 +12,7 @@ const VALID_AUTOCOMPLETE_TEXT = XRegExp('^[-\'()\\p{L}]+$')
 const CHUNK_SIZE = 50
 
 const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, lang })
-const attrCondition = attr => condition => Object.assign({}, condition, { attr })
+const attrCondition = attr => condition => Object.assign({}, condition, attr ? { attr } : {})
 const uniqByHash = fp.uniqBy(doc => doc.hash)
 
 const autoCompleteCache = LRU({
