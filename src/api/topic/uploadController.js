@@ -68,7 +68,7 @@ async function importFile(filePath, originalFilename) {
 
 async function removeTopic(req, res) {
   try {
-    const fileName = req.params.filename
+    const { fileName } = req.params
     const topic = await TopicModel.findOne({ fileName }).exec()
     const loader = topic.type === 'dict' ? dictLoader : articleLoader
     await topic ? loader.removeData(topic) : Promise.resolve()
@@ -108,7 +108,7 @@ async function uploadFile(req, res) {
 async function importFileTask(req, res, file) {
   try {
     await importFile(file.path, file.originalFilename)
-    log.info(`file '${file.originalFilename}' uploaded succesfully`, req.user)
+    log.info(`file '${file.originalFilename}' uploaded successfully`, req.user)
     res.json({ fileName: file.originalFilename })
   }
   catch (err) {

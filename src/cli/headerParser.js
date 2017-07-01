@@ -1,8 +1,8 @@
 'use strict'
 
-const HEADER_START_REGEXP = /<!-- header -->/
-const HEADER_END_REGEXP = /<!-- endHeader -->/
-const HEADER_DIV_REGEXP = /<!-- +(.*?): +(.*?) +-->/g
+const headerStart = /<!-- header -->/
+const headerEnd = /<!-- endHeader -->/
+const headerDiv = /<!-- +(.*?): +(.*?) +-->/g
 
 const defaultProps = {
   groupName: 'public',
@@ -14,13 +14,13 @@ function parseHeaderProps(text) {
   const headerBounds = getHeaderBounds(text)
   const headerText = text.substring(headerBounds[0], headerBounds[1])
 
-  HEADER_DIV_REGEXP.lastIndex = 0
-  let match = HEADER_DIV_REGEXP.exec(headerText)
+  headerDiv.lastIndex = 0
+  let match = headerDiv.exec(headerText)
 
   while (match) {
     const [name, value] = match.slice(1, 3)
     headerProps[name] = /^\d+$/.test(value) ? +value : value
-    match = HEADER_DIV_REGEXP.exec(headerText)
+    match = headerDiv.exec(headerText)
   }
 
   return headerProps
@@ -32,18 +32,18 @@ function removeHeader(text) {
 }
 
 function getHeaderBounds(text) {
-  const startMatch = text.match(HEADER_START_REGEXP)
-  if (!startMatch) {
+  const matchBegin = text.match(headerStart)
+  if (!matchBegin) {
     throw new Error('missing header section')
   }
-  const startPos = startMatch.index
+  const startPos = matchBegin.index
 
-  const endMatch = text.match(HEADER_END_REGEXP)
-  if (!endMatch || endMatch.index < startPos) {
+  const matchEnd = text.match(headerEnd)
+  if (!matchEnd || matchEnd.index < startPos) {
     throw new Error('missing section closing tag')
   }
 
-  const endPos = endMatch.index + endMatch[0].length
+  const endPos = matchEnd.index + matchEnd[0].length
   return [startPos, endPos]
 }
 
