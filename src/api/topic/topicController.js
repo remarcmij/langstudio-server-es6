@@ -42,15 +42,9 @@ async function getPublication(req, res) {
     )({})
 
     const topics = await TopicModel.find(condition)
-      .sort('sortIndex part title')
+      .sort('sortIndex title')
       .lean()
       .exec()
-
-    if (topics.length === 0) {
-      // no matching group or publication not found.
-      // treat as 'unauthorized' http error
-      return res.sendStatus(401)
-    }
 
     log.debug(`${getPublication.name}: ${pub} (${topics.length} topics)`, user)
     res.json(topics)
@@ -67,6 +61,7 @@ async function getAdminTopics(req, res) {
       .sort('publication sortIndex title')
       .lean()
       .exec()
+
     log.debug('fetched admin topics')
     res.json(topics)
   }

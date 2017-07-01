@@ -4,20 +4,26 @@ const HEADER_START_REGEXP = /<!-- header -->/
 const HEADER_END_REGEXP = /<!-- endHeader -->/
 const HEADER_DIV_REGEXP = /<!-- +(.*?): +(.*?) +-->/g
 
-function parseHeader(text) {
-  const headerMap = new Map()
+const defaultProps = {
+  groupName: 'public',
+  sortIndex: 0
+}
+
+function parseHeaderProps(text) {
+  const headerProps = Object.assign({}, defaultProps)
   const headerBounds = getHeaderBounds(text)
   const headerText = text.substring(headerBounds[0], headerBounds[1])
 
   HEADER_DIV_REGEXP.lastIndex = 0
-  let divMatch = HEADER_DIV_REGEXP.exec(headerText)
+  let match = HEADER_DIV_REGEXP.exec(headerText)
 
-  while (divMatch) {
-    headerMap.set(divMatch[1], divMatch[2])
-    divMatch = HEADER_DIV_REGEXP.exec(headerText)
+  while (match) {
+    const [name, value] = match.slice(1, 3)
+    headerProps[name] = /^\d+$/.test(value) ? +value : value
+    match = HEADER_DIV_REGEXP.exec(headerText)
   }
 
-  return headerMap
+  return headerProps
 }
 
 function removeHeader(text) {
@@ -42,6 +48,6 @@ function getHeaderBounds(text) {
 }
 
 module.exports = {
-  parseHeader,
+  parseHeaderProps,
   removeHeader
 }

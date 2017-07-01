@@ -1,6 +1,5 @@
 'use strict'
 const fp = require('lodash/fp')
-const reduce = require('lodash/reduce')
 const LRU = require('lru-cache')
 const XRegExp = require('xregexp')
 
@@ -14,7 +13,7 @@ const CHUNK_SIZE = 50
 
 const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, lang })
 const attrCondition = attr => condition => Object.assign({}, condition, attr === 'k' ? { attr } : {})
-const uniqByText = fp.uniqBy(doc => doc.text)
+const uniqByHash = fp.uniqBy(doc => doc.hash)
 
 const autoCompleteCache = LRU({
   max: 500,
@@ -22,10 +21,10 @@ const autoCompleteCache = LRU({
 })
 
 function searchFirstMatching(words, callback) {
-  return reduce(words, (promise, word) => {
-    return promise
-      .then(docs => docs.length > 0 ? docs : callback(word))
-  }, Promise.resolve([]))
+  const handleSuccess = word => docs => docs.length > 0 ? docs : callback(word)
+  const reducer = (promise, word) => promise.then(handleSuccess(word))
+  const initialPromise = Promise.resolve([])
+  return fp.reduce(reducer, initialPromise)(words)
 }
 
 async function dictSearch(req, res) {
@@ -45,7 +44,7 @@ async function dictSearch(req, res) {
   try {
     const docs = await searchFirstMatching(words, searchWord)
     const haveMore = docs.length === CHUNK_SIZE
-    const lemmas = uniqByText(docs)
+    const lemmas = uniqByHash(docs)
     res.json({ lemmas, haveMore })
   }
   catch ({ message }) {

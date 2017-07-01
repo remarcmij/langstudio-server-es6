@@ -1,124 +1,100 @@
 'use strict'
+const util = require('util')
 const _ = require('lodash')
 const XRegExp = require('xregexp')
 
 const ArticleModel = require('./articleModel')
 const ParagraphModel = require('./paragraphModel')
 const markDownService = require('../../services/markdownService')
-const headerParser = require('../../cli/headerParser')
+const { parseHeaderProps } = require('../../cli/headerParser')
 const autoCompleteIndexer = require('../search/autoCompleteIndexer')
 
 const WORD_REGEXP = XRegExp(String.raw`#?[-'\p{L}]{2,}`, 'g')
 
-async function createData(topic, data) {
-  const article = data.payload
+async function createData(topic, article) {
   article._topic = topic._id
-
   await ArticleModel.create(article)
-  await bulkWriteParagraphs(article, topic)
+  await bulkInsertParagraphs(article, topic)
   await autoCompleteIndexer()
 }
 
-async function bulkWriteParagraphs(article, topic) {
-  const bulkOps = article.paragraphs.reduce((acc, paragraph) => {
-    const ops = paragraph.words.map(word => ({
-      insertOne: {
-        document: {
-          word: word.word,
-          wordLang: word.lang,
-          content: paragraph.content,
-          baseLang: topic.baseLang,
-          targetLang: topic.targetLang,
-          groupName: topic.groupName,
-          _topic: topic._id
-        }
-      }
+async function bulkInsertParagraphs({ paragraphs }, topic) {
+  const { _id: _topic, baseLang, targetLang, groupName } = topic
+  const bulk = paragraphs.reduce((bulk, { words, content }) => {
+    words.forEach(({ word, lang: wordLang }) => bulk.insert({
+      word,
+      content,
+      baseLang,
+      targetLang,
+      groupName,
+      wordLang,
+      _topic
     }))
-    return [...acc, ...ops]
-  }, [])
+    return bulk
+  }, ParagraphModel.collection.initializeUnorderedBulkOp())
 
-  if (bulkOps.length > 0) {
-    await ParagraphModel.collection.bulkWrite(bulkOps)
+  if (bulk.length > 0) {
+    const bulkExecute = util.promisify(bulk.execute.bind(bulk))
+    await bulkExecute()
   }
 }
 
-async function removeData(topic) {
-  if (topic) {
-    await ArticleModel.remove({ _topic: topic._id }).exec()
-    await ParagraphModel.remove({ _topic: topic._id })
-  }
+async function removeData({ _id: _topic }) {
+  await ArticleModel.remove({ _topic }).exec()
+  await ParagraphModel.remove({ _topic }).exec()
 }
 
 function parseFile(content, fileName) {
+  const match = fileName.match(/(.+)\.(.+)\./)
+  const [publication, chapter] = match.slice(1, 3)
 
-  let match = fileName.match(/(.+)\.(.+)\./)
-  if (!match) {
-    throw new Error(`ill-formed filename: ${fileName}`)
-  }
-  const publication = match[1]
-  const chapter = match[2]
-
-  const header = headerParser.parseHeader(content)
-
-  let title = header.get('title')
-
-  if (!title) {
-    const h1RegExp = /^# *([^#][^\n]+)/m
-    match = content.match(h1RegExp)
-    if (match) {
-      title = match[1]
-    }
-  }
-
-  let subtitle = header.get('subtitle')
-
-  if (!subtitle && chapter !== 'index') {
-    const h2RegExp = /^##\s+(.*)$/gm
-    subtitle = ''
-    match = h2RegExp.exec(content)
-
-    while (match) {
-      if (subtitle.length > 0) {
-        subtitle += ' • '
-      }
-      subtitle += match[1]
-      match = h2RegExp.exec(content)
-    }
-  }
-
-  const topic = {
+  const props = Object.assign({
+    type: 'article',
     fileName,
     publication,
     chapter,
-    title,
-    subtitle,
-    type: 'article',
-    targetLang: header.get('targetLang'),
-    baseLang: header.get('baseLang'),
-    groupName: header.get('groupName') || 'public',
-    sortIndex: parseInt(header.get('sortOrder') || '0', 10),
-    author: header.get('author'),
-    copyright: header.get('copyright'),
-    publisher: header.get('publisher'),
-    pubDate: header.get('publicationDate'),
-    isbn: header.get('isbn')
-  }
+    title: parseTitle(content),
+    subtitle: parseSubtitle(chapter, content),
+  }, parseHeaderProps(content))
 
-  const article = {
+  const { title, groupName, baseLang, targetLang } = props
+
+  const payload = {
     fileName,
-    groupName: topic.groupName,
-    title: topic.title || 'untitled',
-    mdText: content
+    title,
+    groupName,
+    mdText: content,
+    htmlText: markDownService.convertMarkdown(content),
+    paragraphs: extractParagraphs(content, baseLang, targetLang)
   }
 
-  article.paragraphs = extractParagraphs(content, topic.baseLang, topic.targetLang)
+  return { props, payload }
+}
 
-  article.htmlText = markDownService.convertMarkdown(content, header.get('foreign-text') === 'true')
+function parseTitle(content) {
+  const h1 = /^# *([^#][^\n]+)/m
+  const match = content.match(h1)
+  return match ? match[1] : 'untitled'
+}
 
-  return {
-    topic: topic,
-    payload: article
+function parseSubtitle(chapter, content) {
+  if (chapter === 'index') {
+    return undefined
   }
+
+  const h2 = /^##\s+(.*)$/gm
+  let subtitle = ''
+  let match = h2.exec(content)
+
+  while (match) {
+    if (subtitle.length > 0) {
+      subtitle += ' • '
+    }
+    subtitle += match[1]
+    match = h2.exec(content)
+  }
+
+  return subtitle
 }
 
 function extractParagraphs(content, baseLang, targetLang) {

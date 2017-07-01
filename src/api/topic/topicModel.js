@@ -16,7 +16,7 @@ const schema = new Schema({
   author: String,
   copyright: String,
   publisher: String,
-  pubdate: String,
+  publicationDate: String,
   isbn: String,
   lastModified: { type: Date, 'default': Date.now() }
 })

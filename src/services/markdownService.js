@@ -5,8 +5,8 @@ const marked = require('marked')
 const foreignFragmentRegExp = /\*{1,2}.+?\*{1,2}/g
 const foreignWordRegExp = XRegExp(String.raw `([-'()\p{L}]{2,})|(<.+?>)`, 'g')
 
-function convertMarkdown(text, isAllForeign) {
-    const markup = isAllForeign ? text : markupFragments(text)
+function convertMarkdown(text) {
+    const markup = markupFragments(text)
 
     const html = marked(markup, {
         breaks: true,

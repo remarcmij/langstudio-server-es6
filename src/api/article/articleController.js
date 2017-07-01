@@ -2,8 +2,7 @@
 const ArticleModel = require('./articleModel')
 const log = require('../../services/logService')
 
-const CONTENT_MARKER_REGEXP = /<!-- flashcard -->/
-const PUBLIC_GROUPS = ['public']
+const flashCardMarker = /<!-- flashcard -->/
 
 async function getArticle(req, res) {
   const { user, params } = req
@@ -14,13 +13,13 @@ async function getArticle(req, res) {
       .lean()
       .exec()
 
-    // no need to send original text if it doesn't data
+    // no need to send markdown text if it doesn't data
     // required by the client
-    if (!CONTENT_MARKER_REGEXP.test(article.mdText)) {
+    if (!flashCardMarker.test(article.mdText)) {
       article.mdText = ''
     }
 
-    const groups = user ? [...user.groups, ...PUBLIC_GROUPS] : PUBLIC_GROUPS
+    const groups = user ? [...user.groups, 'public'] : ['public']
     const isAdmin = user && user.role === 'admin'
 
     if (!isAdmin && groups.indexOf(article.groupName) === -1) {

@@ -1,57 +1,53 @@
 'use strict'
+const util = require('util')
+const md5 = require('md5')
 
 const LemmaModel = require('./lemmaModel')
 const autoCompleteIndexer = require('./autoCompleteIndexer')
 
-async function createData(topic, uploadData) {
+async function createData(topic, payload) {
+  const { _id: _topic, groupName } = topic
+  const { lemmas, baseLang } = payload
 
-  const bulkOps = uploadData.payload.lemmas.reduce((acc, lemma) => {
-    const ops = lemma.words.map(word => ({
-      insertOne: {
-        document: {
-          baseWord: lemma.base,
-          homonym: lemma.homonym,
-          text: lemma.text,
-          word: word.word,
-          attr: word.attr,
-          order: word.order,
-          lang: word.lang,
-          baseLang: uploadData.payload.baseLang,
-          groupName: uploadData.topic.groupName,
-          _topic: topic._id
-        }
-      }
-    }))
-    return [...acc, ...ops]
-  }, [])
+  const bulk = lemmas.reduce((bulk, { words, base, homonym, text }) => {
+    words.forEach(({ word, attr, order, lang }) => {
+      bulk.insert({
+        text,
+        homonym,
+        word,
+        lang,
+        base,
+        baseLang,
+        attr,
+        order,
+        groupName,
+        _topic,
+        hash: md5(text)
+      })
+    })
+    return bulk
+  }, LemmaModel.collection.initializeUnorderedBulkOp())
 
-  if (bulkOps.length > 0) {
-    await LemmaModel.collection.bulkWrite(bulkOps)
+  if (bulk.length > 0) {
+    const bulkExecute = util.promisify(bulk.execute.bind(bulk))
+    await bulkExecute()
     await autoCompleteIndexer()
   }
 }
 
-async function removeData(topic) {
-  if (topic) {
-     await LemmaModel.remove({ _topic: topic._id }).exec()
-  }
+function removeData({ _id: _topic }) {
+  return LemmaModel.remove({ _topic }).exec()
 }
 
 function parseFile(content, fileName) {
-  const data = JSON.parse(content)
-
-  const match = fileName.match(/(.+)\.(.+)\./)
-  if (!match) {
-    throw new Error(`ill-formed filename: ${fileName}`)
-  }
-
+  const payload = JSON.parse(content)
   return {
-    topic: {
-      fileName: fileName,
+    props: {
       type: 'dict',
-      groupName: data.groupName
+      fileName,
+      groupName: payload.groupName
     },
-    payload: data
+    payload
   }
 }
 

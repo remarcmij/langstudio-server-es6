@@ -27,8 +27,8 @@ function getLoader(originalFilename) {
   throw new Error('unsupported file extension')
 }
 
-async function updateTopic(data) {
-  const { fileName } = data.topic
+async function updateTopic(props) {
+  const { fileName } = props
   let topic = await TopicModel.findOne({ fileName }).exec()
   if (topic) {
     delete topic.targetLang
@@ -45,19 +45,25 @@ async function updateTopic(data) {
   } else {
     topic = new TopicModel()
   }
-  Object.assign(topic, data.topic)
+  Object.assign(topic, props)
   topic.lastModified = Date.now()
   return topic.save()
 }
 
 async function importFile(filePath, originalFilename) {
+  if (!/(.+)\.(.+)\./.test(originalFilename)) {
+    throw new Error(`ill-formed filename: ${originalFilename}`)
+  }
+
   const loader = getLoader(originalFilename)
   const content = await readFile(filePath, 'utf-8')
-  const uploadData = loader.parseFile(content, originalFilename)
-  const topic = await TopicModel.findOne({ fileName: originalFilename })
-  await loader.removeData(topic)
-  const updatedTopic = await updateTopic(uploadData)
-  await loader.createData(updatedTopic, uploadData)
+  const { props, payload } = loader.parseFile(content, originalFilename)
+  const oldTopic = await TopicModel.findOne({ fileName: originalFilename })
+  if (oldTopic) {
+    await loader.removeData(oldTopic)
+  }
+  const topic = await updateTopic(props)
+  await loader.createData(topic, payload)
 }
 
 async function removeTopic(req, res) {
@@ -65,7 +71,7 @@ async function removeTopic(req, res) {
     const fileName = req.params.filename
     const topic = await TopicModel.findOne({ fileName }).exec()
     const loader = topic.type === 'dict' ? dictLoader : articleLoader
-    await loader.removeData(topic)
+    await topic ? loader.removeData(topic) : Promise.resolve()
     await TopicModel.remove({ _id: topic._id }).exec()
     res.sendStatus(204)
   }
