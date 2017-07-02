@@ -85,6 +85,7 @@ async function autoCompleteSearch(req, res) {
 
   try {
     const items = await WordModel.find({ word: { $regex: '^' + term } })
+      .sort('word')
       .select('-_id')
       .limit(10)
       .lean()
