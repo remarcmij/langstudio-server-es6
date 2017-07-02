@@ -28,16 +28,16 @@ require('./config/express')(app)
 require('./api')(app)
 
 async function startServer() {
-  const logpath = path.join(__dirname, '../log/')
+  const logPath = path.join(__dirname, '../log/')
   try {
-    await mkdirp(logpath)
+    await mkdirp(logPath)
     http.createServer(app)
       .listen(config.port, config.ip, () => {
         log.info(`Express server listening on ${config.port}, in ${app.get('env')} mode`)
       })
   }
   catch (err) {
-    log.error('mkdirp:' + logpath, err)
+    log.error('mkdirp:' + logPath, err)
   }
 }
 
