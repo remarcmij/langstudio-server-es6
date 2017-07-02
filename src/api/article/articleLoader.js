@@ -45,7 +45,7 @@ async function removeData({ _id: _topic }) {
 }
 
 function parseFile(content, fileName) {
-  const match = fileName.match(/(.+)\.(.+)\./)
+  const match = fileName.match(/^(.+?)\.(.+?)/)
   const [publication, chapter] = match.slice(1, 3)
 
   const props = Object.assign({

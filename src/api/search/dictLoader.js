@@ -40,12 +40,17 @@ function removeData({ _id: _topic }) {
 }
 
 function parseFile(content, fileName) {
+  const match = fileName.match(/^(.+?)\.(.+?)/)
+  const publication = match[1]
   const payload = JSON.parse(content)
+  const { groupName } = payload
+
   return {
     props: {
       type: 'dict',
       fileName,
-      groupName: payload.groupName
+      publication,
+      groupName
     },
     payload
   }
