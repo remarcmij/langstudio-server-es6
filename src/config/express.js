@@ -3,8 +3,10 @@ const path = require('path')
 const morgan = require('morgan')
 const serveStatic = require('serve-static')
 const bodyParser = require('body-parser')
+const graphQLHTTP = require('express-graphql')
 
 const config = require('./environment')
+const schema = require('../data/schema')
 
 const ONE_DAY = 86400000
 
@@ -20,6 +22,11 @@ module.exports = app => {
   app.use(require('method-override')('getter'))
   app.use(require('cookie-parser')())
   app.use(require('passport').initialize())
+
+  app.use('/graphql', graphQLHTTP({
+    schema,
+    graphiql: true
+  }))
 
   if ('production' === env) {
     const docRoot = path.join(config.root, 'public')

@@ -71,21 +71,21 @@ async function removeTopic(req, res) {
     const { fileName } = req.params
     const topic = await TopicModel.findOne({ fileName }).exec()
     const loader = topic.type === 'dict' ? dictLoader : articleLoader
-    await topic ? loader.removeData(topic) : Promise.resolve()
+    ;(await topic) ? loader.removeData(topic) : Promise.resolve()
     await TopicModel.remove({ _id: topic._id }).exec()
     res.sendStatus(204)
-  }
-  catch (err) {
+  } catch (err) {
     res.status(404).send(err.message)
   }
 }
 
 async function uploadFile(req, res) {
-
   const formParse = form => {
     return new Promise((resolve, reject) => {
       form.parse(req, (err, fields, files) => {
-        if (err) { return reject(err) }
+        if (err) {
+          return reject(err)
+        }
         resolve(files.file[0])
       })
     })
@@ -93,11 +93,13 @@ async function uploadFile(req, res) {
 
   try {
     const uploadDir = path.join(__dirname, '../../../upload')
-    const form = new multiparty.Form({ uploadDir: uploadDir, maxFilesSize: 10 * 1024 * 1024 })
+    const form = new multiparty.Form({
+      uploadDir: uploadDir,
+      maxFilesSize: 10 * 1024 * 1024
+    })
     const file = await formParse(form)
     taskQueue.pushTask(() => importFileTask(req, res, file))
-  }
-  catch (err) {
+  } catch (err) {
     const status = err.message.indexOf('maxFilesSize') !== -1 ? 413 : 400
     res.writeHead(status, { 'content-type': 'text/plain', connection: 'close' })
     const response = status === 413 ? 'Request Entity Too Large' : 'Bad Request'
@@ -110,25 +112,27 @@ async function importFileTask(req, res, file) {
     await importFile(file.path, file.originalFilename)
     log.info(`file '${file.originalFilename}' uploaded successfully`, req.user)
     res.json({ fileName: file.originalFilename })
-  }
-  catch (err) {
+  } catch (err) {
     let message
     if (err.name === 'ValidationError') {
       message = err.toString()
     } else {
       message = err.message
     }
-    log.error(`error uploading file '${file.originalFilename}': ${message}`, req.user)
-    res.status(400).send(JSON.stringify({
-      fileName: file.originalFilename,
-      message: message
-    }))
-  }
-  finally {
+    log.error(
+      `error uploading file '${file.originalFilename}': ${message}`,
+      req.user
+    )
+    res.status(400).send(
+      JSON.stringify({
+        fileName: file.originalFilename,
+        message: message
+      })
+    )
+  } finally {
     try {
       await unlink(file.path)
-    }
-    catch (err) {
+    } catch (err) {
       console.log('unlink failed')
     }
   }

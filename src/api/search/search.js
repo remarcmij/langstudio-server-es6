@@ -8,11 +8,16 @@ const WordModel = require('./wordModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
 
-const VALID_AUTOCOMPLETE_TEXT = XRegExp('^[-\'()\\p{L}]+$')
+const VALID_AUTOCOMPLETE_TEXT = XRegExp("^[-'()\\p{L}]+$")
 const CHUNK_SIZE = 50
 
-const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, lang })
-const attrCondition = attr => condition => Object.assign({}, condition, attr ? { attr } : {})
+const wordLangCondition = (word, lang) => condition => ({
+  word,
+  lang,
+  ...condition
+})
+const attrCondition = attr => condition =>
+  attr ? { attr, ...condition } : { ...condition }
 const uniqByHash = fp.uniqBy(doc => doc.hash)
 
 const autoCompleteCache = LRU({
@@ -21,7 +26,8 @@ const autoCompleteCache = LRU({
 })
 
 function searchFirstMatching(words, callback) {
-  const handleSuccess = word => docs => docs.length > 0 ? docs : callback(word)
+  const handleSuccess = word => docs =>
+    docs.length > 0 ? docs : callback(word)
   const reducer = (promise, word) => promise.then(handleSuccess(word))
   const initialPromise = Promise.resolve([])
   return fp.reduce(reducer, initialPromise)(words)
@@ -46,27 +52,20 @@ async function dictSearch(req, res) {
     const haveMore = docs.length === CHUNK_SIZE
     const lemmas = uniqByHash(docs)
     res.json({ lemmas, haveMore })
-  }
-  catch ({ message }) {
+  } catch ({ message }) {
     log.error(`search: '${req.params.word}', error: ${message}`, user)
     res.status(500).send(message)
   }
 }
 
 function execSearch(condition, chunk) {
-  let query = LemmaModel
-    .find(condition)
-    .sort('word order')
+  let query = LemmaModel.find(condition).sort('word order')
 
   if (chunk !== -1) {
-    query = query
-      .skip(CHUNK_SIZE * (chunk || 0))
-      .limit(CHUNK_SIZE)
+    query = query.skip(CHUNK_SIZE * (chunk || 0)).limit(CHUNK_SIZE)
   }
 
-  return query
-    .lean()
-    .exec()
+  return query.lean().exec()
 }
 
 async function autoCompleteSearch(req, res) {
@@ -93,8 +92,7 @@ async function autoCompleteSearch(req, res) {
     autoCompleteCache.set(term, { term, items })
     log.silly(`cache store for '${term}'`)
     res.json(items)
-  }
-  catch ({ message }) {
+  } catch ({ message }) {
     res.sendStatus(500).send(message)
   }
 }

@@ -9,6 +9,7 @@
       "request": "launch",
       "name": "Launch server",
       "program": "${workspaceRoot}/src/app.js",
+      "runtimeArgs": ["--use_strict", "--es_staging"],
       "cwd": "${workspaceRoot}",
       "protocol": "inspector",
       "console": "integratedTerminal",

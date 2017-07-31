@@ -10,8 +10,8 @@ const userSchema = new Schema({
   email: { type: String, lowercase: true },
   role: {
     type: String,
-    'default': 'user',
-    'enum': ['user', 'admin']
+    default: 'user',
+    enum: ['user', 'admin']
   },
   created: Date,
   lastAccessed: Date,
@@ -36,58 +36,48 @@ const userSchema = new Schema({
  */
 userSchema
   .virtual('password')
-  .set(function (password) {
+  .set(function(password) {
     this._password = password
     this.salt = this.makeSalt()
     this.hashedPassword = this.encryptPassword(password)
   })
-  .get(function () {
+  .get(function() {
     return this._password
   })
 
 // Public profile information
-userSchema
-  .virtual('profile')
-  .get(function () {
-    return {
-      'name': this.name,
-      'role': this.role
-    }
-  })
+userSchema.virtual('profile').get(function() {
+  return {
+    name: this.name,
+    role: this.role
+  }
+})
 
 // Non-sensitive info we'll be putting in the token
-userSchema
-  .virtual('token')
-  .get(function () {
-    return {
-      '_id': this._id,
-      'role': this.role
-    }
-  })
+userSchema.virtual('token').get(function() {
+  return {
+    _id: this._id,
+    role: this.role
+  }
+})
 
-userSchema
-  .virtual('handle')
-  .get(function () {
-    return this.email || 'anonymous'
-  })
+userSchema.virtual('handle').get(function() {
+  return this.email || 'anonymous'
+})
 
 /**
  * Validations
  */
 
 // Validate empty email
-userSchema
-  .path('email')
-  .validate(function (email) {
-    return !!email.length
-  }, 'Email cannot be blank')
+userSchema.path('email').validate(function(email) {
+  return !!email.length
+}, 'Email cannot be blank')
 
 // Validate empty password
-userSchema
-  .path('hashedPassword')
-  .validate(function (hashedPassword) {
-    return !!hashedPassword.length
-  }, 'Password cannot be blank')
+userSchema.path('hashedPassword').validate(function(hashedPassword) {
+  return !!hashedPassword.length
+}, 'Password cannot be blank')
 
 // Validate email is not taken
 // schema
@@ -111,24 +101,24 @@ function validatePresenceOf(value) {
 /**
  * Pre-save hook
  */
-userSchema
-  .pre('save', function (next) {
-    if (!this.isNew) {
-      return void next()
-    }
+userSchema.pre('save', function(next) {
+  if (!this.isNew) {
+    return void next()
+  }
 
-    if (!validatePresenceOf(this.hashedPassword) && AUTH_TYPES.indexOf(this.provider) === -1) {
-      next(new Error('Invalid password'))
-    } else {
-      next()
-    }
-  })
+  if (
+    !validatePresenceOf(this.hashedPassword) &&
+    AUTH_TYPES.indexOf(this.provider) === -1
+  ) {
+    next(new Error('Invalid password'))
+  } else {
+    next()
+  }
+})
 
 /**
  * Methods
  */
-
-
 
 userSchema.methods = {
   /**
@@ -138,7 +128,7 @@ userSchema.methods = {
    * @return {Boolean}
    * @api public
    */
-  authenticate: function (plainText) {
+  authenticate: function(plainText) {
     return this.encryptPassword(plainText) === this.hashedPassword
   },
 
@@ -148,7 +138,7 @@ userSchema.methods = {
    * @return {String}
   * @api public
    */
-  makeSalt: function () {
+  makeSalt: function() {
     return crypto.randomBytes(16).toString('base64')
   },
 
@@ -159,12 +149,13 @@ userSchema.methods = {
    * @return {String}
   * @api public
    */
-  encryptPassword: function (password) {
+  encryptPassword: function(password) {
     if (!password || !this.salt) {
       return ''
     }
     const salt = new Buffer(this.salt, 'base64')
-    return crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha1')
+    return crypto
+      .pbkdf2Sync(password, salt, 10000, 64, 'sha1')
       .toString('base64')
   }
 }

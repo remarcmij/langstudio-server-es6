@@ -6,17 +6,18 @@ const flashCardMarker = /<!-- flashcard -->/
 
 async function getArticle(req, res) {
   const { user, params } = req
+  const { filename: fileName } = params
 
   try {
-    const article = await ArticleModel.findOne({ fileName: params.filename })
+    const article = await ArticleModel.findOne({ fileName })
       .populate('_topic')
       .lean()
       .exec()
 
     // no need to send markdown text if it doesn't data
     // required by the client
-    if (!flashCardMarker.test(article.mdText)) {
-      article.mdText = ''
+    if (!flashCardMarker.test(article.rawBody)) {
+      article.rawBody = ''
     }
 
     const groups = user ? [...user.groups, 'public'] : ['public']
@@ -27,8 +28,7 @@ async function getArticle(req, res) {
       return res.sendStatus(401)
     }
     res.json(article)
-  }
-  catch (err) {
+  } catch (err) {
     log.error(`get article error ${err.message}`, user)
     res.status(500).send(err.message)
   }

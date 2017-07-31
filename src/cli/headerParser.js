@@ -10,7 +10,7 @@ const defaultProps = {
 }
 
 function parseHeaderProps(text) {
-  const headerProps = Object.assign({}, defaultProps)
+  const headerProps = { ...defaultProps }
   const headerBounds = getHeaderBounds(text)
   const headerText = text.substring(headerBounds[0], headerBounds[1])
 

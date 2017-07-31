@@ -59,7 +59,6 @@ function silly(message, user) {
   }
 }
 
-
 module.exports = {
   debug,
   info,

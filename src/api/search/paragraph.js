@@ -8,7 +8,11 @@ const auth = require('../../auth/authService')
 const CHUNK_SIZE = 50
 
 const uniqByTopic = fp.uniqBy(doc => doc._topic)
-const wordLangCondition = (word, lang) => condition => Object.assign({}, condition, { word, wordLang: lang })
+const wordLangCondition = (word, lang) => condition => ({
+  word,
+  wordLang: lang,
+  ...condition
+})
 
 async function search(req, res) {
   const { query, user } = req
@@ -20,9 +24,8 @@ async function search(req, res) {
       auth.userGroupsCondition(user)
     )({})
 
-    const docs = await ParagraphModel
-      .find(condition)
-      .skip(CHUNK_SIZE * (+chunk))
+    const docs = await ParagraphModel.find(condition)
+      .skip(CHUNK_SIZE * +chunk)
       .limit(CHUNK_SIZE)
       .lean()
       .exec()
@@ -30,8 +33,7 @@ async function search(req, res) {
     const haveMore = docs.length === CHUNK_SIZE
     const paragraphs = uniqByTopic(docs)
     res.json({ paragraphs, haveMore })
-  }
-  catch (err) {
+  } catch (err) {
     log.error(`search: '${word}', error: ${err.message}`, user)
     res.status(500).send(err.message)
   }

@@ -8,11 +8,13 @@ const ParagraphModel = require('../article/paragraphModel')
 const log = require('../../services/logService')
 const search = require('../search/search')
 
-const REBUILD_DELAY = 20000  // 20 secs
+const REBUILD_DELAY = 20000 // 20 secs
 
 async function rebuildForLang(lang) {
   const lemmaWords = await LemmaModel.distinct('word', { lang }).exec()
-  const paraWords = await ParagraphModel.distinct('word', { wordLang: lang }).exec()
+  const paraWords = await ParagraphModel.distinct('word', {
+    wordLang: lang
+  }).exec()
   return new Set([...lemmaWords, ...paraWords])
 }
 
@@ -23,7 +25,7 @@ async function rebuildAutoCompleteCollection() {
     const paraLangs = await ParagraphModel.distinct('wordLang').exec()
     const languages = _.uniq([...lemmaLangs, ...paraLangs])
 
-    const promises = languages.map(async (lang) => {
+    const promises = languages.map(async lang => {
       const wordSet = await rebuildForLang(lang)
       return { lang, wordSet }
     })
@@ -40,8 +42,7 @@ async function rebuildAutoCompleteCollection() {
       search.clearAutoCompleteCache()
       log.info(`auto-complete collection rebuilt`)
     }
-  }
-  catch ({ message }) {
+  } catch ({ message }) {
     log.error(`Error rebuilding auto-complete collection: ${message}`)
   }
 }

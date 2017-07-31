@@ -21,15 +21,17 @@ async function createData(topic, article) {
 async function bulkInsertParagraphs({ paragraphs }, topic) {
   const { _id: _topic, baseLang, targetLang, groupName } = topic
   const bulk = paragraphs.reduce((bulk, { words, content }) => {
-    words.forEach(({ word, lang: wordLang }) => bulk.insert({
-      word,
-      content,
-      baseLang,
-      targetLang,
-      groupName,
-      wordLang,
-      _topic
-    }))
+    words.forEach(({ word, lang: wordLang }) =>
+      bulk.insert({
+        word,
+        content,
+        baseLang,
+        targetLang,
+        groupName,
+        wordLang,
+        _topic
+      })
+    )
     return bulk
   }, ParagraphModel.collection.initializeUnorderedBulkOp())
 
@@ -45,17 +47,19 @@ async function removeData({ _id: _topic }) {
 }
 
 function parseFile(content, fileName) {
-  const match = fileName.match(/^(.+?)\.(.+?)/)
+  const match = fileName.match(/^(.+?)\.(.+?)\./)
   const [publication, chapter] = match.slice(1, 3)
+  const headerProps = parseHeaderProps(content)
 
-  const props = Object.assign({
+  const props = {
     type: 'article',
     fileName,
     publication,
     chapter,
     title: parseTitle(content),
     subtitle: parseSubtitle(chapter, content),
-  }, parseHeaderProps(content))
+    ...headerProps
+  }
 
   const { title, groupName, baseLang, targetLang } = props
 
@@ -63,8 +67,8 @@ function parseFile(content, fileName) {
     fileName,
     title,
     groupName,
-    mdText: content,
-    htmlText: markDownService.convertMarkdown(content),
+    rawBody: content,
+    body: markDownService.convertMarkdown(content),
     paragraphs: extractParagraphs(content, baseLang, targetLang)
   }
 
@@ -164,7 +168,10 @@ function extractAllWords(paragraph, baseLang, targetLang) {
   baseBuffer = baseBuffer.replace(/\n/g, ' ')
   targetBuffer = targetBuffer.replace(/\n/g, ' ')
 
-  return [...extractWords(baseBuffer, baseLang), ...extractWords(targetBuffer, targetLang)]
+  return [
+    ...extractWords(baseBuffer, baseLang),
+    ...extractWords(targetBuffer, targetLang)
+  ]
 }
 
 function extractWords(buffer, lang) {
