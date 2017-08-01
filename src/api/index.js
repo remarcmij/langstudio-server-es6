@@ -9,8 +9,8 @@ module.exports = app => {
   })
 
   // Insert routes below
-  app.use('/api/topics', require('./topic'))
-  app.use('/api/upload', require('./topic'))
+  app.use('/api/topics', require('./topics'))
+  app.use('/api/upload', require('./topics'))
   app.use('/api/article', require('./article'))
   app.use('/api/search', require('./search'))
   app.use('/api/download', require('./download'))

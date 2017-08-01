@@ -1,6 +1,6 @@
 'use strict'
 const flow = require('lodash/fp/flow')
-const TopicModel = require('../api/topic/topicModel')
+const TopicModel = require('../api/topics/topicModel')
 const auth = require('../auth/authService')
 
 const indexCondition = condition => ({ type: 'article', chapter: 'index', ...condition })
