@@ -1,37 +1,41 @@
 'use strict'
+const _ = require('lodash')
+const Rx = require('rxjs')
+
 const ArticleModel = require('./articleModel')
-const log = require('../../services/logService')
+const auth = require('../../auth/authService')
 
-const flashCardMarker = /<!-- flashcard -->/
+function getArticle(req, res) {
 
-async function getArticle(req, res) {
-  const { user, params } = req
-  const { filename: fileName } = params
+  const createCondition = (fileName, user) => auth.userGroupsCondition(user)({ fileName })
+  const findArticle = condition => ArticleModel.findOne(condition)
+    .populate('_topic')
+    .lean()
+    .exec()
+  const findPromise = _.flow(createCondition, findArticle)
 
-  try {
-    const article = await ArticleModel.findOne({ fileName })
-      .populate('_topic')
-      .lean()
-      .exec()
+  const checkIfFound = article => article ? { article, status: 200 } : { status: 404 }
 
-    // no need to send markdown text if it doesn't data
-    // required by the client
-    if (!flashCardMarker.test(article.rawBody)) {
-      article.rawBody = ''
-    }
+  const hasFlashCardSection = article => /<!-- flashcard -->/.test(article.rawBody)
 
-    const groups = user ? [...user.groups, 'public'] : ['public']
-    const isAdmin = user && user.role === 'admin'
+  const omitRawBodyIfNoFlashCards = ({ article, status }) =>
+    status === 200 && !hasFlashCardSection(article)
+      ? { article: _.omit(article, 'rawBody'), status }
+      : { article, status }
 
-    if (!isAdmin && groups.indexOf(article.groupName) === -1) {
-      log.warn(`access denied: ${article.fileName}`, user)
-      return res.sendStatus(401)
-    }
-    res.json(article)
-  } catch (err) {
-    log.error(`get article error ${err.message}`, user)
-    res.status(500).send(err.message)
-  }
+  Rx.Observable
+    .fromPromise(findPromise(req.params.filename, req.user))
+    .map(checkIfFound)
+    .map(omitRawBodyIfNoFlashCards)
+    .subscribe(({ article, status }) => {
+      if (status !== 200) {
+        res.sendStatus(status)
+      } else {
+        res.json(article)
+      }
+    }, err => {
+      res.status(500).send(err.message)
+    })
 }
 
 module.exports = {

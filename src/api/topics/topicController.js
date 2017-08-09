@@ -1,6 +1,5 @@
 'use strict'
 const _ = require('lodash')
-const flow = require('lodash/fp/flow')
 const TopicModel = require('./topicModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
@@ -9,31 +8,26 @@ const indexCondition = condition => Object.assign({}, condition, { type: 'articl
 const articleCondition = pub => condition => Object.assign({}, condition, { type: 'article', publication: pub })
 const allCondition = condition => Object.assign({}, condition, { type: 'article' })
 
-
 function getIndexTopics(req, res) {
-  const { user, } = req
-  const condition = flow(
+  const condition = _.flow(
     indexCondition,
-    auth.userGroupsCondition(user),
+    auth.userGroupsCondition(req.user),
   )({})
   getTopics(condition, res)
 }
 
 function getPublicationTopics(req, res) {
-  const { user, params } = req
-  const { pub } = params
-  const condition = flow(
-    articleCondition(pub),
-    auth.userGroupsCondition(user)
+  const condition = _.flow(
+    articleCondition(req.params.pub),
+    auth.userGroupsCondition(req.user)
   )({})
   getTopics(condition, res)
 }
 
 function getAllTopics(req, res) {
-  const { user } = req
-  const condition = flow(
+  const condition = _.flow(
     allCondition,
-    auth.userGroupsCondition(user)
+    auth.userGroupsCondition(req.user)
   )({})
   getTopics(condition, res)
 }
