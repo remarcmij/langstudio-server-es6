@@ -43,6 +43,7 @@
     "babel-cli": "^6.24.1",
     "connect-livereload": "^0.6.0",
     "del": "^2.2.2",
+    "eslint": "^4.4.1",
     "gulp": "^3.9.1",
     "jasmine-core": "^2.6.4",
     "open": "0.0.5",

@@ -8,73 +8,70 @@ const indexCondition = condition => Object.assign({}, condition, { type: 'articl
 const articleCondition = pub => condition => Object.assign({}, condition, { type: 'article', publication: pub })
 const allCondition = condition => Object.assign({}, condition, { type: 'article' })
 
+const sendJSON = res => result => res.json(result)
+
+const handleError = (req, res) => err => {
+  log.error(`error: ${err.message}`, req.user)
+  res.status(500).send(err.message)
+}
+
+const getTopics = (req, res, condition) => {
+  TopicModel.find(condition(req))
+    .sort('sortIndex title')
+    .lean()
+    .exec()
+    .then(sendJSON(res))
+    .catch(handleError(req, res))
+}
+
 function getIndexTopics(req, res) {
-  const condition = _.flow(
+  const condition = req => _.flow(
     indexCondition,
     auth.userGroupsCondition(req.user),
   )({})
-  getTopics(condition, res)
+  getTopics(req, res, condition)
 }
 
 function getPublicationTopics(req, res) {
-  const condition = _.flow(
+  const condition = req => _.flow(
     articleCondition(req.params.pub),
     auth.userGroupsCondition(req.user)
   )({})
-  getTopics(condition, res)
+  getTopics(req, res, condition)
 }
 
 function getAllTopics(req, res) {
-  const condition = _.flow(
+  const condition = req => _.flow(
     allCondition,
-    auth.userGroupsCondition(req.user)
+    auth.userGroupsCondition(req.user),
   )({})
-  getTopics(condition, res)
+  getTopics(req, res, condition)
 }
 
-async function getTopics(condition, res) {
-  try {
-    const topics = await TopicModel.find(condition)
-      .sort('sortIndex title')
-      .lean()
-      .exec()
-    res.json(topics)
-  }
-  catch ({ message }) {
-    log.error(message)
-    res.status(500).send(message)
-  }
-}
+function getGroups(req, res) {
 
-async function getGroups(req, res) {
-  try {
-    const topics = await TopicModel.find({})
-      .select('groupName publication -_id')
-      .sort('groupName')
-      .lean()
-      .exec()
+  const groupByGroupName = topics => _.reduce(topics, (hash, { groupName, publication }) => {
+    const set = hash[groupName] || new Set()
+    hash[groupName] = set
+    set.add(publication)
+    return hash
+  }, {})
 
-    const groupMap = _.reduce(topics, (map, { groupName: name, publication }) => {
-      const set = map[name] || new Set()
-      map[name] = set
-      set.add(publication)
-      return map
-    }, {})
+  const joinPublications = groups => _.reduce(groups, (arr, pubNames, name) => {
+    const publications = [...pubNames].join(', ')
+    arr.push({ name, publications })
+    return arr
+  }, [])
 
-    const groups = _.reduce(groupMap, (arr, pubs, name) => {
-      const publications = [...pubs].join(', ')
-      arr.push({ name, publications })
-      return arr
-    }, [])
+  const aggregateGroups = _.flow(groupByGroupName, joinPublications)
 
-    log.debug('fetched group info', req.user)
-    res.json(groups)
-  }
-  catch ({ message }) {
-    const { user } = req
-    log.error(`get group info error ${message}`, user)
-    res.status(500).send(message)
-  }
+  TopicModel.find({})
+    .select('groupName publication -_id')
+    .sort('groupName')
+    .lean().exec()
+    .then(aggregateGroups)
+    .then(sendJSON(res))
+    .catch(handleError(req, res))
 }
 
 module.exports = {
@@ -83,5 +80,3 @@ module.exports = {
   getAllTopics,
   getGroups
 }
-
-
