@@ -4,9 +4,9 @@ const TopicModel = require('./topicModel')
 const log = require('../../services/logService')
 const auth = require('../../auth/authService')
 
-const indexCondition = condition => Object.assign({}, condition, { type: 'article', chapter: 'index' })
-const articleCondition = pub => condition => Object.assign({}, condition, { type: 'article', publication: pub })
-const allCondition = condition => Object.assign({}, condition, { type: 'article' })
+const indexTopicsCondition = condition => Object.assign({}, condition, { type: 'article', chapter: 'index' })
+const publicationTopicsCondition = pub => condition => Object.assign({}, condition, { type: 'article', publication: pub })
+const allTopicsCondition = condition => Object.assign({}, condition, { type: 'article' })
 
 const sendJSON = res => result => res.json(result)
 
@@ -15,37 +15,44 @@ const handleError = (req, res) => err => {
   res.status(500).send(err.message)
 }
 
-const getTopics = (req, res, condition) => {
-  TopicModel.find(condition(req))
+const findTopics = condition =>
+  TopicModel.find(condition)
     .sort('sortIndex title')
     .lean()
     .exec()
+
+const handlePromise = (req, res) => promise =>
+  promise
     .then(sendJSON(res))
     .catch(handleError(req, res))
+
+const getTopics = (req, res) => condition => {
+  _.flow(
+    auth.userGroupsCondition(req.user),
+    findTopics,
+    handlePromise(req, res)
+  )(condition)
 }
 
 function getIndexTopics(req, res) {
-  const condition = req => _.flow(
-    indexCondition,
-    auth.userGroupsCondition(req.user),
+  _.flow(
+    indexTopicsCondition,
+    getTopics(req, res)
   )({})
-  getTopics(req, res, condition)
 }
 
 function getPublicationTopics(req, res) {
-  const condition = req => _.flow(
-    articleCondition(req.params.pub),
-    auth.userGroupsCondition(req.user)
+  _.flow(
+    publicationTopicsCondition(req.params.pub),
+    getTopics(req, res)
   )({})
-  getTopics(req, res, condition)
 }
 
 function getAllTopics(req, res) {
-  const condition = req => _.flow(
-    allCondition,
-    auth.userGroupsCondition(req.user),
+  _.flow(
+    allTopicsCondition,
+    getTopics(req, res)
   )({})
-  getTopics(req, res, condition)
 }
 
 function getGroups(req, res) {
@@ -63,7 +70,10 @@ function getGroups(req, res) {
     return arr
   }, [])
 
-  const aggregateGroups = _.flow(groupByGroupName, joinPublications)
+  const aggregateGroups = _.flow(
+    groupByGroupName,
+    joinPublications
+  )
 
   TopicModel.find({})
     .select('groupName publication -_id')
