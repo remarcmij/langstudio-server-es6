@@ -1,6 +1,4 @@
 
-'use strict'
-
 module.exports[404] = function pageNotFound(req, res) {
   const viewFilePath = '404'
   const status = 404

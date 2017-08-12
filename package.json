@@ -40,6 +40,23 @@
     "xregexp": "^3.2.0"
   },
   "devDependencies": {
+    "@types/express": "^4.0.36",
+    "@types/express-jwt": "0.0.36",
+    "@types/jsonwebtoken": "^7.2.3",
+    "@types/lodash": "^4.14.72",
+    "@types/lru-cache": "^4.0.0",
+    "@types/marked": "^0.3.0",
+    "@types/md5": "^2.1.32",
+    "@types/method-override": "0.0.29",
+    "@types/mkdirp": "^0.5.0",
+    "@types/mongoose": "^4.7.19",
+    "@types/morgan": "^1.7.32",
+    "@types/multiparty": "0.0.31",
+    "@types/passport": "^0.3.3",
+    "@types/passport-google-oauth": "^1.0.35",
+    "@types/request": "^2.0.0",
+    "@types/winston": "^2.3.4",
+    "@types/xregexp": "^3.0.29",
     "babel-cli": "^6.24.1",
     "connect-livereload": "^0.6.0",
     "del": "^2.2.2",
@@ -56,6 +73,6 @@
     "node": ">=6.0.0"
   },
   "scripts": {
-    "start": "nodemon --use_strict --es_staging src/app.js"
+    "start": "nodemon --use_strict --es_staging build/app.js"
   }
 }

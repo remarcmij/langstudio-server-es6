@@ -8,7 +8,7 @@
       "type": "node",
       "request": "launch",
       "name": "Launch server",
-      "program": "${workspaceRoot}/src/app.js",
+      "program": "${workspaceRoot}/build/app.js",
       "runtimeArgs": ["--use_strict", "--es_staging"],
       "cwd": "${workspaceRoot}",
       "protocol": "inspector",
