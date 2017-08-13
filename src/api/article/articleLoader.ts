@@ -26,7 +26,6 @@ interface ArticleWithParagraphs extends Article {
   paragraphs: ParagraphItem[]
 }
 
-
 export function createData(topic: TopicDocument, article: ArticleWithParagraphs): Promise<void> {
   const updatedArticle = Object.assign({}, article, { _topic: topic._id })
   return ArticleModel.create(updatedArticle)
@@ -36,9 +35,9 @@ export function createData(topic: TopicDocument, article: ArticleWithParagraphs)
 
 function bulkInsertParagraphs({ paragraphs }: ArticleWithParagraphs, topic: TopicDocument): Promise<any> | undefined {
   const { _id: _topic, baseLang, targetLang, groupName } = topic
-  const bulk = paragraphs.reduce((bulk, { words, content }) => {
+  const bulk = paragraphs.reduce((acc, { words, content }) => {
     words.forEach(({ word, lang: wordLang }) =>
-      bulk.insert({
+      acc.insert({
         word,
         content,
         baseLang,
@@ -48,7 +47,7 @@ function bulkInsertParagraphs({ paragraphs }: ArticleWithParagraphs, topic: Topi
         _topic
       })
     )
-    return bulk
+    return acc
   }, ParagraphModel.collection.initializeUnorderedBulkOp())
 
   if (bulk.length > 0) {
@@ -137,7 +136,7 @@ function extractParagraphs(content: string, baseLang: string, targetLang: string
       continue
     }
 
-    let content = removeLinePrefixIfAny(line)
+    let text = removeLinePrefixIfAny(line)
 
     while (!item.done) {
       line = item.value.trim()
@@ -145,13 +144,13 @@ function extractParagraphs(content: string, baseLang: string, targetLang: string
       if (line.length === 0) {
         break
       }
-      content += '\n' + removeLinePrefixIfAny(line)
+      text += '\n' + removeLinePrefixIfAny(line)
     }
 
     let words = []
-    if (containsTargetLangFragment(content)) {
-      words = extractAllWords(content, baseLang, targetLang)
-      paragraphs.push({ content, words })
+    if (containsTargetLangFragment(text)) {
+      words = extractAllWords(text, baseLang, targetLang)
+      paragraphs.push({ content: text, words })
     }
   }
 
